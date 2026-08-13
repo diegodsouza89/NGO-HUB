@@ -1,0 +1,6 @@
+{
+  "name": "NGO Knowledge Hub",
+  "description": "Comprehensive multi-language knowledge portal, AI compliance assistant, and resource toolkits for non-profit organizations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
