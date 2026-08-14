@@ -269,7 +269,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 mb-1">
                       Short Description ({SUPPORTED_LANGUAGES.find(l => l.code === activeLangTab)?.name})
                     </label>
                     <textarea
