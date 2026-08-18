@@ -1,0 +1,32 @@
+# Netlify configuration for the NGO Knowledge Hub.
+#
+# Why this file exists:
+#   The app was generated for Google AI Studio and expects an Express server
+#   (server.ts) to answer /api/* requests. Netlify serves the site statically,
+#   so that server never runs and /api/translate returned 404 — which is why
+#   "Auto-Translate with AI" silently failed.
+#
+#   The Netlify Function in netlify/functions/ replaces that endpoint.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Map the API path to the function. The function also declares this path
+# itself (config.path), so this block is belt-and-braces for older setups.
+[[redirects]]
+  from = "/api/translate"
+  to = "/.netlify/functions/translate"
+  status = 200
+  force = true
+
+# Single-page-app fallback. This MUST stay last so it does not swallow /api/*.
+# It is what makes /staff (the admin portal) load on a hard refresh.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

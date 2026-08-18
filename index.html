@@ -3,11 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>NGO Knowledge Hub — Impact Foundation India</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!--
+      Points at src/components/src/ because that is the only complete copy of the
+      app in this repo. The outer copies (src/ and src/components/) are partial:
+      src/lib/storage.ts and src/data/initialData.ts do not exist, and
+      src/components/admin/ is missing ReportingAnalytics, SettingsManager,
+      SupportTickets and UserManager — so building from them fails.
+    -->
+    <script type="module" src="/src/components/src/main.tsx"></script>
   </body>
 </html>
-
