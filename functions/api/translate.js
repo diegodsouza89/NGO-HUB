@@ -41,7 +41,7 @@ const LANGS = {
 };
 
 const INDIC_MODEL = '@cf/ai4bharat/indictrans2-en-indic-1B';
-const GEMINI_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 const GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Keep Gemini requests small enough to fit inside free-tier per-minute limits.
@@ -125,65 +125,84 @@ function restoreSpans(text, kept) {
 
 /* ------------------------------------------------------- engine: IndicTrans2 */
 
-async function runIndic(ai, text, flores) {
-  // The published docs disagree on the parameter name, so try both shapes.
-  const shapes = [
-    { text, target_language: flores, source_language: 'eng_Latn' },
-    { text, target_lang: flores, source_lang: 'english' },
-  ];
-  let lastError;
-  for (const input of shapes) {
-    try {
-      const res = await ai.run(INDIC_MODEL, input);
-      const value =
-        (res && (res.translated_text || res.translation || res.result || res.response)) ||
-        (typeof res === 'string' ? res : null);
-      if (Array.isArray(value)) return String(value[0] == null ? '' : value[0]);
-      if (value) return String(value);
-      lastError = new Error('Workers AI returned an unrecognised response shape.');
-    } catch (err) {
-      lastError = err;
-    }
+// Published schema: input { text: string | string[], target_language }
+// output { translations: string[] }.  Batching keeps it to one call per article.
+const INDIC_BATCH = 40;
+
+function extractTranslations(res, expected) {
+  const pick = (v) => (Array.isArray(v) ? v : typeof v === 'string' ? [v] : null);
+  let out =
+    pick(res && res.translations) ||
+    pick(res && res.translated_text) ||
+    pick(res && res.translation) ||
+    pick(res && res.result) ||
+    pick(typeof res === 'string' ? res : null);
+  if (!out) {
+    const keys = res && typeof res === 'object' ? Object.keys(res).join(', ') : typeof res;
+    throw new Error('Workers AI response had no translations (keys: ' + keys + ')');
   }
-  throw lastError || new Error('Workers AI translation failed.');
+  if (out.length !== expected) {
+    throw new Error('Workers AI returned ' + out.length + ' translations for ' + expected + ' inputs');
+  }
+  return out.map((t) => String(t == null ? '' : t));
 }
 
-async function translateWithIndic(ai, title, body, flores, deadline) {
-  const outLines = [];
+async function runIndic(ai, texts, flores) {
+  const results = [];
+  for (let i = 0; i < texts.length; i += INDIC_BATCH) {
+    const batch = texts.slice(i, i + INDIC_BATCH);
+    const res = await ai.run(INDIC_MODEL, { text: batch, target_language: flores });
+    const got = extractTranslations(res, batch.length);
+    for (const t of got) results.push(t);
+  }
+  return results;
+}
+
+async function translateWithIndic(ai, title, body, flores) {
   const lines = String(body).split('\n');
+  const jobs = [];
+  const plan = [];
   let inCodeFence = false;
 
-  for (const line of lines) {
-    if (Date.now() > deadline) throw new Error('DEADLINE');
-
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (/^\s*```/.test(line)) {
       inCodeFence = !inCodeFence;
-      outLines.push(line);
+      plan.push({ keep: line });
       continue;
     }
     if (inCodeFence || isUntranslatable(line)) {
-      outLines.push(line);
+      plan.push({ keep: line });
       continue;
     }
-
     const m = line.match(PREFIX_RE);
     const prefix = m ? m[1] : '';
     const content = m ? m[2] : line;
-
     if (!content.trim()) {
-      outLines.push(line);
+      plan.push({ keep: line });
       continue;
     }
-
-    const { masked, kept } = protectSpans(content);
-    const translated = await runIndic(ai, masked, flores);
-    outLines.push(prefix + restoreSpans(translated, kept).trim());
+    const masked = protectSpans(content);
+    plan.push({ prefix: prefix, kept: masked.kept, job: jobs.length });
+    jobs.push(masked.masked);
   }
 
-  const t = protectSpans(String(title));
-  const translatedTitle = restoreSpans(await runIndic(ai, t.masked, flores), t.kept).trim();
+  const titleMask = protectSpans(String(title));
+  const titleJob = jobs.length;
+  jobs.push(titleMask.masked);
 
-  return { translatedTitle, translatedBody: outLines.join('\n') };
+  const translated = await runIndic(ai, jobs, flores);
+
+  const outLines = plan.map((step) =>
+    'keep' in step
+    ? step.keep
+    : step.prefix + restoreSpans(translated[step.job], step.kept).trim()
+    );
+
+  return {
+    translatedTitle: restoreSpans(translated[titleJob], titleMask.kept).trim(),
+    translatedBody: outLines.join('\n'),
+  };
 }
 
 /* ------------------------------------------------------------ engine: Gemini */
