@@ -1,0 +1,3 @@
+# SPA fallback so /staff works on a direct visit or hard refresh.
+# Cloudflare Pages Functions in functions/api/ are matched before this rule.
+/*    /index.html   200
