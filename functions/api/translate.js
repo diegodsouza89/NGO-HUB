@@ -101,10 +101,11 @@ function protectSpans(text) {
   };
 
   let out = text
-    .replace(/`[^`]*`/g, stash)              // inline code
-    .replace(/!?\[[^\]]*\]\([^)]*\)/g, stash) // links and images
-    .replace(/https?:\/\/[^\s)]+/g, stash)    // bare URLs
-    .replace(/\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, stash); // emails
+  .replace(/`[^`]*`/g, stash)
+  .replace(/!?\[[^\]]*\]\([^)]*\)/g, stash)
+  .replace(/https?:\/\/[^\s)]+/g, stash)
+  .replace(/\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, stash)
+  .replace(/\*\*|__/g, stash);
 
   for (const term of PROTECTED) {
     const re = new RegExp('\\b' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g');
@@ -113,14 +114,34 @@ function protectSpans(text) {
   return { masked: out, kept };
 }
 
+/**
+ * Put the protected spans back. IndicTrans2 drops the padding spaces we added,
+  * so spacing is re-inserted rather than trusted - without this you get
+   * "Google Workspacemein" and "liyehttps://...". tidySpacing then pulls bold
+    * delimiters back onto their text.
+     */
 function restoreSpans(text, kept) {
   let out = String(text == null ? '' : text);
-  for (let i = 0; i < kept.length; i++) {
-    // Tolerate the model changing spacing or letter case around the marker.
+  // Descending so zq1zq is never confused with zq10zq, and a function
+  // replacement so a "$" inside the kept text is not read as a replacement
+  // pattern - their content contains amounts like "$10,000/month".
+  for (let i = kept.length - 1; i >= 0; i--) {
     const re = new RegExp('\\s*z\\s*q\\s*' + i + '\\s*z\\s*q\\s*', 'gi');
-    out = out.replace(re, kept[i]);
+    out = out.replace(re, () => ' ' + kept[i] + ' ');
   }
-  return out;
+  return tidySpacing(out);
+}
+
+function tidySpacing(text) {
+  return String(text)
+  .replace(/\*[ \t]+\*/g, '**')
+  .replace(/_[ \t]+_/g, '__')
+  .replace(/\*\*[ \t]*([^*\n]+?)[ \t]*\*\*/g, '**$1**')
+  .replace(/__[ \t]*([^_\n]+?)[ \t]*__/g, '__$1__')
+  .replace(/[ \t]{2,}/g, ' ')
+  .replace(/[ \t]+([,.;:!?)\]।])/g, '$1')
+  .replace(/([(\[])[ \t]+/g, '$1')
+  .trim();
 }
 
 /* ------------------------------------------------------- engine: IndicTrans2 */
