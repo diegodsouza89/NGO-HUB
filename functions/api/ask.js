@@ -166,6 +166,11 @@ function buildPrompt(question, docs, languageName) {
 function normaliseResult(parsed, docs) {
   const answer = str(parsed && parsed.answer).trim();
   if (!answer) throw new Error('The AI returned an empty answer.');
+  // "[object Object]" means something stringified a structure by accident.
+  // Treat it as a failure so the next engine gets a turn.
+  if (answer === '[object Object]' || answer === 'undefined' || answer === 'null') {
+    throw new Error('The AI returned an unreadable answer.');
+  }
 
   const known = new Set(docs.map((d) => d.id));
   const ids = Array.isArray(parsed && parsed.sourceIds) ? parsed.sourceIds : [];
@@ -255,6 +260,33 @@ function parseLooseJson(text) {
   return null;
 }
 
+/**
+ * Workers AI does not answer with one fixed shape: depending on the model you
+ * can get a plain string, { response: "..." }, or { response: { ... } } with
+ * the JSON already parsed. Live traffic hit the last case and printed the
+ * literal text "[object Object]" to a visitor, so unwrap carefully instead of
+ * assuming a string.
+ */
+function unwrapReply(res, depth) {
+  const level = depth || 0;
+  if (res == null || level > 4) return { text: '', obj: null };
+  if (typeof res === 'string') return { text: res, obj: null };
+  if (typeof res !== 'object') return { text: String(res), obj: null };
+
+  // Already the object we wanted.
+  if (typeof res.answer === 'string') return { text: '', obj: res };
+
+  const keys = ['response', 'result', 'output_text', 'text', 'content'];
+  for (const key of keys) {
+    if (res[key] !== undefined && res[key] !== null) return unwrapReply(res[key], level + 1);
+  }
+  // OpenAI-shaped reply.
+  const choice = Array.isArray(res.choices) ? res.choices[0] : null;
+  if (choice) return unwrapReply(choice.message ? choice.message.content : choice, level + 1);
+
+  return { text: '', obj: null };
+}
+
 async function runCloudflare(ai, model, prompt, docs) {
   const res = await ai.run(model, {
     messages: [
@@ -271,7 +303,8 @@ async function runCloudflare(ai, model, prompt, docs) {
     temperature: 0.3,
   });
 
-  const text = str(res && (res.response || res.result || res.output_text));
+  const { text, obj } = unwrapReply(res, 0);
+  if (obj && str(obj.answer).trim()) return obj;
   if (!text.trim()) throw new Error('Workers AI returned an empty response.');
 
   const parsed = parseLooseJson(text);
@@ -347,7 +380,12 @@ export async function onRequest(context) {
       try {
         const parsed = await runCloudflare(ai, model, prompt, docs);
         const result = normaliseResult(parsed, docs);
-        return json(Object.assign(result, { engine: 'workers-ai:' + model }));
+        return json(
+          Object.assign(result, {
+            engine: 'workers-ai:' + model,
+            fallbackFrom: errors.length ? errors[0].split(':')[0] : undefined,
+          })
+        );
       } catch (e) {
         errors.push('workers-ai/' + model + ': ' + (e && e.message ? e.message : e));
       }
