@@ -13,7 +13,21 @@ import {
   HelpCircle,
   ArrowRight,
   BookOpen,
-  Layers
+  Compass,
+  Receipt,
+  PhoneCall,
+  Cloud,
+  Palette,
+  Megaphone,
+  Globe,
+  Code2,
+  BrainCircuit,
+  BadgeCheck,
+  HeartHandshake,
+  BarChart3,
+  Server,
+  Wrench,
+  Bot
 } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 
@@ -34,7 +48,6 @@ export const CategoryList: React.FC<CategoryListProps> = ({
   onSelectArticle,
   selectedResourceType,
 }) => {
-  const [activeDomainFilter, setActiveDomainFilter] = useState<'all' | 'compliance' | 'tech'>('all');
   const [activeSubTab, setActiveSubTab] = useState<'knowledge-hub' | 'articles'>('knowledge-hub');
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
@@ -58,22 +71,44 @@ export const CategoryList: React.FC<CategoryListProps> = ({
         return <Lock className="w-6 h-6 text-rose-600" />;
       case 'Sparkles':
         return <Sparkles className="w-6 h-6 text-amber-500" />;
+      // Icons the tech categories use. Without these the card falls back to a
+      // question mark, which is what several categories were showing.
+      case 'Compass':
+        return <Compass className="w-6 h-6 text-sky-600" />;
+      case 'BadgeCheck':
+        return <BadgeCheck className="w-6 h-6 text-emerald-600" />;
+      case 'Receipt':
+        return <Receipt className="w-6 h-6 text-blue-600" />;
+      case 'HeartHandshake':
+        return <HeartHandshake className="w-6 h-6 text-rose-600" />;
+      case 'PhoneCall':
+        return <PhoneCall className="w-6 h-6 text-teal-600" />;
+      case 'Megaphone':
+        return <Megaphone className="w-6 h-6 text-orange-600" />;
+      case 'Cloud':
+        return <Cloud className="w-6 h-6 text-sky-500" />;
+      case 'Server':
+        return <Server className="w-6 h-6 text-slate-600" />;
+      case 'Palette':
+        return <Palette className="w-6 h-6 text-fuchsia-600" />;
+      case 'Globe':
+        return <Globe className="w-6 h-6 text-indigo-600" />;
+      case 'Code2':
+        return <Code2 className="w-6 h-6 text-violet-600" />;
+      case 'Wrench':
+        return <Wrench className="w-6 h-6 text-amber-700" />;
+      case 'BrainCircuit':
+        return <BrainCircuit className="w-6 h-6 text-purple-600" />;
+      case 'Bot':
+        return <Bot className="w-6 h-6 text-purple-500" />;
+      case 'BarChart3':
+        return <BarChart3 className="w-6 h-6 text-indigo-600" />;
       default:
         return <HelpCircle className="w-6 h-6 text-sky-600" />;
     }
   };
 
-  const isTechCategory = (catId: string) => {
-    return ['cat-tech-grants', 'cat-crm-fundraising', 'cat-field-tech', 'cat-cybersecurity', 'cat-ai-tech'].includes(catId);
-  };
-
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
-
-  const filteredCategories = sortedCategories.filter(cat => {
-    if (activeDomainFilter === 'tech') return isTechCategory(cat.id);
-    if (activeDomainFilter === 'compliance') return !isTechCategory(cat.id);
-    return true;
-  });
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -82,14 +117,14 @@ export const CategoryList: React.FC<CategoryListProps> = ({
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 pb-4 border-b border-slate-200 gap-4">
             <div>
               <span className="text-xs font-bold text-sky-700 uppercase tracking-widest block mb-1">
-                NGO Knowledge Domains
+                NGO Technology Domains
               </span>
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                Resource, Compliance & Tech Categories
+                NGO Technology Categories
               </h2>
             </div>
             <p className="text-slate-500 text-sm max-w-md">
-              Explore statutory compliance, grant writing toolkits, M&E frameworks, and technology tools built specifically for non-profits.
+              Explore the software, cloud services and digital tools that non-profits can get free or heavily discounted — with the eligibility steps for each.
             </p>
           </div>
 
@@ -116,47 +151,9 @@ export const CategoryList: React.FC<CategoryListProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mb-8 bg-slate-100 p-1.5 rounded-2xl w-fit">
-            <button
-              onClick={() => setActiveDomainFilter('all')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeDomainFilter === 'all'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-4 h-4 text-sky-600" />
-              <span>All Categories ({categories.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveDomainFilter('compliance')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeDomainFilter === 'compliance'
-                  ? 'bg-white text-sky-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-sky-600" />
-              <span>Resource & Compliance ({categories.filter(c => !isTechCategory(c.id)).length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveDomainFilter('tech')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeDomainFilter === 'tech'
-                  ? 'bg-white text-purple-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Laptop className="w-4 h-4 text-purple-600" />
-              <span>NGO Tech Stack & Automation ({categories.filter(c => isTechCategory(c.id)).length})</span>
-            </button>
-          </div>
-
           {activeSubTab === 'knowledge-hub' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCategories.map(cat => {
+              {sortedCategories.map(cat => {
                 let catArticles = articles.filter(a => a.categoryId === cat.id && a.published);
                 if (selectedResourceType && selectedResourceType !== 'all') {
                   catArticles = catArticles.filter(a => a.resourceType === selectedResourceType);
@@ -164,7 +161,6 @@ export const CategoryList: React.FC<CategoryListProps> = ({
 
                 const name = cat.names[currentLanguage] || cat.names.en || "Category";
                 const description = cat.descriptions[currentLanguage] || cat.descriptions.en || "";
-                const isTech = isTechCategory(cat.id);
 
                 return (
                   <div
@@ -172,7 +168,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                     onClick={() => onSelectCategory(cat)}
                     className="group bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:border-sky-500 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden"
                   >
-                    <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${isTech ? 'from-purple-500 to-indigo-600' : 'from-sky-500 to-blue-600'} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
                     <div>
                       <div className="flex items-center justify-between mb-4">
@@ -180,11 +176,6 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                           {getCategoryIcon(cat.icon)}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                            isTech ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-sky-50 text-sky-700 border border-sky-200'
-                          }`}>
-                            {isTech ? 'NGO Tech Tool' : 'Compliance & Resource'}
-                          </span>
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 group-hover:bg-sky-100 group-hover:text-sky-950 transition-colors">
                             <BookOpen className="w-3 h-3 text-sky-700" />
                             {catArticles.length}

@@ -172,7 +172,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
       <div className="max-w-4xl mx-auto text-center relative z-10">
         <div className="inline-flex items-center gap-2 bg-sky-100/80 border border-sky-300 text-sky-950 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide mb-5 shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-sky-700 animate-pulse" />
-          <span>Central Knowledge, Tools &amp; Compliance Portal for Non-Profits</span>
+          <span>Free &amp; Discounted Technology for Non-Profits</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-3 leading-tight">
@@ -202,7 +202,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
               }}
               onFocus={() => setIsOpen(true)}
               onKeyDown={onKeyDown}
-              placeholder={'Search ' + totalResources + ' resources — FCRA, 80G, grants, data protection…'}
+              placeholder={'Search ' + totalResources + ' resources — Google Workspace, cloud credits, CRM, cybersecurity…'}
               className="w-full rounded-2xl border border-slate-300 bg-white/95 pl-12 pr-11 py-3.5 text-sm sm:text-base text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100 transition"
             />
             {query && (

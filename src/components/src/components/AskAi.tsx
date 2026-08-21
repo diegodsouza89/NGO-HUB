@@ -28,9 +28,9 @@ interface AskResponse {
 }
 
 const SAMPLE_QUESTIONS = [
-  'How do I write a grant proposal?',
-  'What are the FCRA compliance rules?',
   'Which free software can an NGO use?',
+  'How do we get Google Workspace for free?',
+  'What cloud credits are available to non-profits?',
 ];
 
 /** How many articles to send as context, and how much of each. */
@@ -175,7 +175,7 @@ export const AskAi: React.FC<AskAiProps> = ({ articles, currentLanguage, onSelec
               onKeyDown={(e) => {
                 if (e.key === 'Enter') ask();
               }}
-              placeholder="Ask about compliance, grants, tech…"
+              placeholder="Ask about software, cloud, security…"
               aria-label="Your question"
               className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-3 focus:ring-sky-100 focus:border-sky-400"
             />

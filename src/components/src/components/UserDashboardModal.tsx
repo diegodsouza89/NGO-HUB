@@ -144,7 +144,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                   <Bookmark className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-slate-700">No saved resources yet</p>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                    Bookmark articles, FCRA guides, proposal templates, and M&E frameworks while browsing to build your organization's quick-access library.
+                    Bookmark tool guides, eligibility checklists and setup walkthroughs while browsing to build your organization's quick-access library.
                   </p>
                 </div>
               ) : (

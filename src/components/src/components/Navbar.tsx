@@ -76,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {settings.siteName}
               </div>
               <div className="text-xs font-semibold text-sky-700 tracking-wide">
-                NGO Knowledge & Compliance Portal
+                NGO Technology & Digital Tools Portal
               </div>
             </div>
           </div>

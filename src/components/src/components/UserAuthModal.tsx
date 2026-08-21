@@ -103,7 +103,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
           </div>
           <h2 className="text-2xl font-bold tracking-tight">NGO Professional Portal</h2>
           <p className="text-sm text-sky-100/90 mt-1">
-            Access toolkits, best practices, case studies, and compliance resources tailored for social sector leaders.
+            Access tool guides, eligibility checklists and setup walkthroughs built for social sector teams.
           </p>
         </div>
 

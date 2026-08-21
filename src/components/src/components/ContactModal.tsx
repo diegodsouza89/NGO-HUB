@@ -168,7 +168,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   required
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  placeholder="e.g. Clarification on FCRA quarterly return deadline"
+                  placeholder="e.g. Our Google for Nonprofits verification is stuck"
                   className="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:border-sky-600 font-medium"
                 />
               </div>

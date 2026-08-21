@@ -316,7 +316,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               Was this knowledge resource helpful for your NGO?
             </h4>
             <p className="text-slate-500 text-xs">
-              Your feedback helps us refine non-profit compliance guides and toolkits.
+              Your feedback helps us keep these technology guides accurate and useful.
             </p>
           </div>
 
