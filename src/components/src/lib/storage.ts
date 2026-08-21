@@ -500,8 +500,12 @@ export function getAnalyticsData() {
     days.push({
       date: dateStr,
       displayDate,
-      logins: dayLogins > 0 ? dayLogins : Math.floor((i % 4) + 1),
-      views: dayViews > 0 ? dayViews : Math.floor(totalViews / 20) + (i % 3) * 4,
+      // Real counts only. These two lines used to fall back to invented values
+      // - Math.floor((i % 4) + 1) for logins and totalViews / 20 for views - so the
+      // chart displayed traffic that never happened. An empty chart is better than
+      // a false one.
+      logins: dayLogins,
+      views: dayViews,
     });
   }
 
