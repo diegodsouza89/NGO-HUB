@@ -5,6 +5,7 @@ import { CategoryList } from './components/CategoryList';
 import { CategoryDetail } from './components/CategoryDetail';
 import { ArticleView } from './components/ArticleView';
 import { ContactModal } from './components/ContactModal';
+import { AskAi } from './components/AskAi';
 import { UserAuthModal } from './components/UserAuthModal';
 import { UserDashboardModal } from './components/UserDashboardModal';
 import { AdminLogin } from './components/admin/AdminLogin';
@@ -180,6 +181,7 @@ export default function App() {
                     articles={articles}
                     currentLanguage={currentLanguage}
                     onSelectCategory={handleSelectCategory}
+                    onSelectArticle={handleSelectArticle}
                     selectedResourceType={selectedResourceType}
                   />
                 </>
@@ -244,6 +246,13 @@ export default function App() {
               setCurrentUser(null);
               setIsUserDashboardOpen(false);
             }}
+          />
+
+          {/* Floating AI assistant - available on every public page */}
+          <AskAi
+            articles={articles}
+            currentLanguage={currentLanguage}
+            onSelectArticle={handleSelectArticle}
           />
 
           {/* Ticket Modal */}
