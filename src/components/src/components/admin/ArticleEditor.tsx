@@ -246,7 +246,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
                   type="text"
                   value={(activeArticle.tags || []).join(', ')}
                   onChange={(e) => setActiveArticle({ ...activeArticle, tags: e.target.value.split(',').map(t => t.trim()) })}
-                  placeholder="80G, tax, receipt"
+                  placeholder="google workspace, email, free"
                   className="w-full px-3 py-2 text-sm border border-stone-200 rounded-xl font-medium bg-white"
                 />
               </div>

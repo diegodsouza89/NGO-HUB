@@ -127,7 +127,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               14-Day Knowledge Article Traffic Trend
             </h3>
             <p className="text-slate-500 text-xs mt-0.5">
-              Daily readership across all non-profit resource guides and compliance toolkits.
+              Daily readership across all non-profit technology guides and toolkits.
             </p>
           </div>
           <span className="text-xs font-semibold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">
