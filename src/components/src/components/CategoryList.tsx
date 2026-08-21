@@ -1,25 +1,19 @@
 import React, { useState } from 'react';
-import { 
-  Award, 
-  ShieldCheck, 
-  Users, 
-  FileBarChart, 
-  FolderArchive, 
-  Laptop, 
-  Database, 
-  Smartphone, 
-  Lock, 
+import {
+  Award,
+  ShieldCheck,
+  Users,
+  FileBarChart,
+  FolderArchive,
+  Laptop,
+  Database,
+  Smartphone,
+  Lock,
   Sparkles,
-  HelpCircle, 
+  HelpCircle,
   ArrowRight,
   BookOpen,
-  Layers,
-  Wrench,
-  BrainCircuit,
-  Search,
-  MessageSquareText,
-  Lightbulb
-  ,X
+  Layers
 } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 
@@ -28,6 +22,7 @@ interface CategoryListProps {
   articles: Article[];
   currentLanguage: Language;
   onSelectCategory: (category: Category) => void;
+  onSelectArticle: (article: Article) => void;
   selectedResourceType: string;
 }
 
@@ -36,75 +31,11 @@ export const CategoryList: React.FC<CategoryListProps> = ({
   articles,
   currentLanguage,
   onSelectCategory,
+  onSelectArticle,
   selectedResourceType,
 }) => {
   const [activeDomainFilter, setActiveDomainFilter] = useState<'all' | 'compliance' | 'tech'>('all');
   const [activeSubTab, setActiveSubTab] = useState<'knowledge-hub' | 'articles'>('knowledge-hub');
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiResults, setAiResults] = useState<Array<{ article: Article; answer: string }>>([]);
-  const [isAiOpen, setIsAiOpen] = useState(true);
-
-  const getArticleText = (article: Article) => {
-    const langBody = article.bodies[currentLanguage] || article.bodies.en || '';
-    const fallbackBody = article.bodies.en || '';
-    return `${article.titles[currentLanguage] || article.titles.en || ''} ${langBody || fallbackBody} ${article.tags.join(' ')}`.toLowerCase();
-  };
-
-  const buildAnswer = (article: Article, question: string) => {
-    const title = article.titles[currentLanguage] || article.titles.en || 'Article';
-    const body = article.bodies[currentLanguage] || article.bodies.en || '';
-    const cleaned = body.replace(/[#*_`>\-]+/g, ' ').replace(/\s+/g, ' ').trim();
-    const snippet = cleaned.length > 220 ? `${cleaned.slice(0, 220)}...` : cleaned;
-
-    if (!question.trim()) {
-      return `This article covers ${title}. ${snippet || 'View the article for more detail.'}`;
-    }
-
-    return `Based on the article “${title}”, the relevant guidance is: ${snippet || 'The article includes practical suggestions for this topic.'}`;
-  };
-
-  const handleAiSearch = () => {
-    const trimmed = aiQuestion.trim();
-    if (!trimmed) {
-      setAiResults([]);
-      return;
-    }
-
-    const normalized = trimmed.toLowerCase();
-    const matches = articles
-      .filter(article => article.published)
-      .map(article => {
-        const text = getArticleText(article);
-        const words = normalized.split(/\s+/).filter(Boolean);
-        let score = 0;
-
-        if (text.includes(normalized)) score += 20;
-        words.forEach(word => {
-          if (text.includes(word)) score += 4;
-        });
-        if (article.tags.some(tag => tag.toLowerCase().includes(normalized))) score += 10;
-        const title = (article.titles[currentLanguage] || article.titles.en || '').toLowerCase();
-        if (title.includes(normalized)) score += 12;
-
-        return { article, score };
-      })
-      .filter(entry => entry.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
-      .map(entry => ({
-        article: entry.article,
-        answer: buildAnswer(entry.article, trimmed),
-      }));
-
-    setAiResults(matches);
-  };
-
-  const sampleQuestions = [
-    'How do I write a grant proposal?',
-    'What should I know about donor compliance?',
-    'How can NGOs use technology for impact?',
-  ];
-
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
       case 'Award':
@@ -328,12 +259,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <button
                           type="button"
-                          onClick={() => {
-                            const categoryMatch = categories.find(cat => cat.id === article.categoryId);
-                            if (categoryMatch) {
-                              onSelectCategory(categoryMatch);
-                            }
-                          }}
+                          onClick={() => onSelectArticle(article)}
                           className="inline-flex items-center gap-2 text-xs font-semibold text-sky-700 hover:text-sky-800 cursor-pointer underline decoration-sky-200 underline-offset-4"
                         >
                           <span>Open Article</span>
@@ -349,113 +275,6 @@ export const CategoryList: React.FC<CategoryListProps> = ({
 
       </div>
 
-      {isAiOpen && (
-        <div className="mt-8 flex justify-end">
-          <div className="fixed bottom-5 right-5 z-50">
-            <div className="flex items-center justify-end mb-1.5 pr-1.5">
-              <div className="w-10 h-10 rounded-full bg-orange-500 shadow-lg shadow-orange-200/80 border-2 border-white flex items-center justify-center text-white font-extrabold text-[10px]">
-                AI
-              </div>
-            </div>
-
-            <div className="w-[290px] rounded-[20px] border border-slate-200 bg-white/95 shadow-[0_8px_22px_rgba(15,23,42,0.10)] backdrop-blur-sm overflow-hidden">
-              <div className="flex items-center justify-start px-2.5 py-1.5 border-b border-slate-100 bg-slate-50/80">
-                <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm">
-                  <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-[9px] font-bold">
-                    AI
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsAiOpen(false)}
-                  aria-label="Close AI"
-                  className="ml-auto text-slate-500 hover:text-slate-800 rounded p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="px-2.5 pt-2 pb-1 bg-white">
-                <div className="rounded-lg bg-slate-50 text-slate-700 text-sm leading-relaxed px-2 py-1.5 border border-slate-100 shadow-sm">
-                  We are AI enabled - Ask our insights hub anything
-                </div>
-              </div>
-
-              <div className="px-3 pb-3 pt-0">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    value={aiQuestion}
-                    onChange={(e) => setAiQuestion(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAiSearch();
-                    }}
-                    placeholder="Ask AI..."
-                    className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-3 focus:ring-sky-100 focus:border-sky-400"
-                  />
-                </div>
-
-                <button
-                  onClick={handleAiSearch}
-                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white px-3 py-2 text-sm font-semibold transition-colors cursor-pointer"
-                >
-                  <MessageSquareText className="w-4 h-4" />
-                  Ask AI
-                </button>
-
-                <div className="mt-3 space-y-2 min-h-[80px]">
-                  {!aiQuestion.trim() && aiResults.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50/70 p-2 text-[12px] text-slate-600">
-                      <div className="flex items-center gap-1.5 text-sky-700 font-semibold mb-1">
-                        <Lightbulb className="w-3.5 h-3.5" />
-                        Quick answer
-                      </div>
-                      Ask about grants, donor compliance, or NGO technology.
-                    </div>
-                  )}
-
-                  {aiQuestion.trim() && aiResults.length === 0 && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-[12px] text-slate-600">
-                      No direct article match yet. Try a more specific keyword.
-                    </div>
-                  )}
-
-                  {aiResults.map(({ article, answer }) => {
-                    const categoryMatch = categories.find(cat => cat.id === article.categoryId);
-
-                    return (
-                      <button
-                        key={article.id}
-                        type="button"
-                        onClick={() => {
-                          if (categoryMatch) {
-                            onSelectCategory(categoryMatch);
-                          }
-                        }}
-                        className="w-full text-left rounded-xl border border-sky-200 bg-sky-50/70 p-2 cursor-pointer hover:bg-sky-100 transition-colors"
-                      >
-                        <div className="text-[11px] font-bold text-slate-900">{article.titles[currentLanguage] || article.titles.en || 'Article'}</div>
-                        <p className="mt-1 text-[12px] leading-relaxed text-slate-700">{answer}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!isAiOpen && (
-        <div className="fixed bottom-5 right-5 z-50">
-          <button
-            onClick={() => setIsAiOpen(true)}
-            aria-label="Open AI"
-            className="w-10 h-10 rounded-full bg-orange-500 shadow-lg shadow-orange-200/80 border-2 border-white flex items-center justify-center text-white font-extrabold text-[10px]"
-          >
-            AI
-          </button>
-        </div>
-      )}
     </section>
   );
 };
