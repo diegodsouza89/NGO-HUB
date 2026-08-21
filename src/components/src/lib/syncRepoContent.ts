@@ -59,12 +59,23 @@ export function syncRepoContent(): void {
       STAMP_KEYS.categories,
       INITIAL_CATEGORIES
     );
+    // The engagement counters in content.json - views 2451, downloads 890,
+    // bookmarks 410 - are demo values that were typed in, not measurements.
+    // Zero them at seed time so the dashboard starts from truth. Real counts
+    // accumulate from there via incrementArticleView.
+    const zeroCounters = (a: any) => Object.assign({}, a, {
+      views: 0,
+      downloadsCount: 0,
+      bookmarkCount: 0,
+      helpfulYes: 0,
+      helpfulNo: 0,
+    });
     const articlesChanged = syncOne(
       DATA_KEYS.articles,
       STAMP_KEYS.articles,
-      INITIAL_ARTICLES
-    );
-
+      INITIAL_ARTICLES.map(zeroCounters)
+      );
+    
     if (categoriesChanged || articlesChanged) {
       console.info(
         `[NGO Hub] Content refreshed from content.json — ` +
