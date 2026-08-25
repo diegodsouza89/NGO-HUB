@@ -1,35 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Award,
-  ShieldCheck,
-  Users,
-  FileBarChart,
-  FolderArchive,
-  Laptop,
-  Database,
-  Smartphone,
-  Lock,
-  Sparkles,
-  HelpCircle,
   ArrowRight,
-  BookOpen,
-  Compass,
-  Receipt,
-  PhoneCall,
-  Cloud,
-  Palette,
-  Megaphone,
-  Globe,
-  Code2,
-  BrainCircuit,
-  BadgeCheck,
-  HeartHandshake,
-  BarChart3,
-  Server,
-  Wrench,
-  Bot
+  BookOpen
 } from 'lucide-react';
 import { Article, Category, Language } from '../types';
+import { CategoryIcon } from '../lib/categoryIcons';
 
 interface CategoryListProps {
   categories: Category[];
@@ -49,65 +24,6 @@ export const CategoryList: React.FC<CategoryListProps> = ({
   selectedResourceType,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'knowledge-hub' | 'articles'>('knowledge-hub');
-  const getCategoryIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'Award':
-        return <Award className="w-6 h-6 text-amber-600" />;
-      case 'ShieldCheck':
-        return <ShieldCheck className="w-6 h-6 text-sky-600" />;
-      case 'Users':
-        return <Users className="w-6 h-6 text-blue-600" />;
-      case 'FileBarChart':
-        return <FileBarChart className="w-6 h-6 text-indigo-600" />;
-      case 'FolderArchive':
-        return <FolderArchive className="w-6 h-6 text-cyan-600" />;
-      case 'Laptop':
-        return <Laptop className="w-6 h-6 text-purple-600" />;
-      case 'Database':
-        return <Database className="w-6 h-6 text-teal-600" />;
-      case 'Smartphone':
-        return <Smartphone className="w-6 h-6 text-emerald-600" />;
-      case 'Lock':
-        return <Lock className="w-6 h-6 text-rose-600" />;
-      case 'Sparkles':
-        return <Sparkles className="w-6 h-6 text-amber-500" />;
-      // Icons the tech categories use. Without these the card falls back to a
-      // question mark, which is what several categories were showing.
-      case 'Compass':
-        return <Compass className="w-6 h-6 text-sky-600" />;
-      case 'BadgeCheck':
-        return <BadgeCheck className="w-6 h-6 text-emerald-600" />;
-      case 'Receipt':
-        return <Receipt className="w-6 h-6 text-blue-600" />;
-      case 'HeartHandshake':
-        return <HeartHandshake className="w-6 h-6 text-rose-600" />;
-      case 'PhoneCall':
-        return <PhoneCall className="w-6 h-6 text-teal-600" />;
-      case 'Megaphone':
-        return <Megaphone className="w-6 h-6 text-orange-600" />;
-      case 'Cloud':
-        return <Cloud className="w-6 h-6 text-sky-500" />;
-      case 'Server':
-        return <Server className="w-6 h-6 text-slate-600" />;
-      case 'Palette':
-        return <Palette className="w-6 h-6 text-fuchsia-600" />;
-      case 'Globe':
-        return <Globe className="w-6 h-6 text-indigo-600" />;
-      case 'Code2':
-        return <Code2 className="w-6 h-6 text-violet-600" />;
-      case 'Wrench':
-        return <Wrench className="w-6 h-6 text-amber-700" />;
-      case 'BrainCircuit':
-        return <BrainCircuit className="w-6 h-6 text-purple-600" />;
-      case 'Bot':
-        return <Bot className="w-6 h-6 text-purple-500" />;
-      case 'BarChart3':
-        return <BarChart3 className="w-6 h-6 text-indigo-600" />;
-      default:
-        return <HelpCircle className="w-6 h-6 text-sky-600" />;
-    }
-  };
-
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
 
   return (
@@ -173,7 +89,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <div className="w-12 h-12 rounded-xl bg-slate-100 group-hover:bg-sky-50 flex items-center justify-center transition-colors">
-                          {getCategoryIcon(cat.icon)}
+                          <CategoryIcon name={cat.icon} />
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 group-hover:bg-sky-100 group-hover:text-sky-950 transition-colors">
