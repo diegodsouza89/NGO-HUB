@@ -18,6 +18,7 @@ import {
   getArticles, 
   getTickets, 
   getSettings, 
+  saveSettings,
   isAdminAuthenticated,
   getCurrentUser
 } from './lib/storage';
@@ -140,6 +141,13 @@ export default function App() {
       ) : currentView === 'admin_login' ? (
         <AdminLogin
           savedPasswordHash={settings.adminPasswordHash}
+          onPasswordUpgraded={(hashed) => {
+            // A plain-text password was just verified. Store the hashed form so
+            // the readable copy stops sitting in this browser.
+            const updated = { ...settings, adminPasswordHash: hashed };
+            saveSettings(updated);
+            setSettings(updated);
+          }}
           onSuccess={() => {
             window.history.pushState({}, '', '/staff');
             setCurrentView('admin_panel');
