@@ -65,6 +65,14 @@ export function saveTickets(tickets: SupportTicket[]): void {
   localStorage.setItem(KEYS.TICKETS, JSON.stringify(tickets));
 }
 
+/**
+ * SUPERSEDED. Kept only so resetToDefaults and older callers still compile.
+ *
+ * This wrote a support ticket into the visitor's own browser and returned a
+ * reference number for a request nobody would ever receive. The contact form
+ * now posts to /api/tickets, which stores it in Cloudflare D1. Do not use this
+ * for new work - see lib/tickets.ts.
+ */
 export function createTicket(data: Omit<SupportTicket, 'id' | 'ticketId' | 'status' | 'createdAt'>): SupportTicket {
   const tickets = getTickets();
   const ticketId = `NGO-${Math.floor(100000 + Math.random() * 900000)}`;
