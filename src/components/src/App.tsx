@@ -12,11 +12,10 @@ import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { Footer } from './components/Footer';
 
-import { Category, Article, SupportTicket, SiteSettings, Language, User as UserType } from './types';
+import { Category, Article, SiteSettings, Language, User as UserType } from './types';
 import { 
   getCategories, 
   getArticles, 
-  getTickets, 
   getSettings, 
   saveSettings,
   isAdminAuthenticated,
@@ -29,7 +28,6 @@ export default function App() {
   // Core Data States
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [settings, setSettings] = useState<SiteSettings>(getSettings());
   const [currentUser, setCurrentUser] = useState<UserType | null>(getCurrentUser());
 
@@ -55,7 +53,6 @@ export default function App() {
   const refreshData = () => {
     setCategories(getCategories());
     setArticles(getArticles());
-    setTickets(getTickets());
     setSettings(getSettings());
     setCurrentUser(getCurrentUser());
   };
@@ -114,7 +111,6 @@ export default function App() {
         <AdminLayout
           articles={articles}
           categories={categories}
-          tickets={tickets}
           settings={settings}
           onArticlesUpdated={(updated) => {
             setArticles(updated);
@@ -122,10 +118,6 @@ export default function App() {
           }}
           onCategoriesUpdated={(updated) => {
             setCategories(updated);
-            refreshData();
-          }}
-          onTicketsUpdated={(updated) => {
-            setTickets(updated);
             refreshData();
           }}
           onSettingsUpdated={(updated) => {
