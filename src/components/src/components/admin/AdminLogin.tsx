@@ -1,28 +1,100 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Lock, ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ShieldCheck, Lock, ArrowRight, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { setAdminAuthenticated } from '../../lib/storage';
+import {
+  canHash,
+  clearFailures,
+  describeWait,
+  hashPassword,
+  isHashed,
+  lockedForMs,
+  recordFailure,
+  verifyPassword,
+} from '../../lib/adminAuth';
 
 interface AdminLoginProps {
   onSuccess: () => void;
   onBackToSite: () => void;
   savedPasswordHash: string;
+  /**
+   * Called once when an old plain-text password is verified, so the caller can
+   * replace it with a hash. Optional: without it login still works, the stored
+   * value simply stays in its old form.
+   */
+  onPasswordUpgraded?: (hashed: string) => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({
   onSuccess,
   onBackToSite,
   savedPasswordHash,
+  onPasswordUpgraded,
 }) => {
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
+  const [lockMs, setLockMs] = useState(() => lockedForMs());
+  const timer = useRef<number | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Keep the countdown honest while the form is locked.
+  useEffect(() => {
+    if (lockMs <= 0) return;
+    timer.current = window.setInterval(() => {
+      const left = lockedForMs();
+      setLockMs(left);
+      if (left <= 0 && timer.current !== null) {
+        window.clearInterval(timer.current);
+        timer.current = null;
+      }
+    }, 1000);
+    return () => {
+      if (timer.current !== null) window.clearInterval(timer.current);
+      timer.current = null;
+    };
+  }, [lockMs > 0]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === savedPasswordHash || password === 'changeme123') {
+    if (isChecking) return;
+
+    const waiting = lockedForMs();
+    if (waiting > 0) {
+      setLockMs(waiting);
+      setError('Too many attempts. Try again in ' + describeWait(waiting) + '.');
+      return;
+    }
+
+    setIsChecking(true);
+    setError('');
+    try {
+      const ok = await verifyPassword(password, savedPasswordHash);
+      if (!ok) {
+        const lockedFor = recordFailure();
+        setLockMs(lockedFor);
+        setError(
+          lockedFor > 0
+            ? 'Too many attempts. Try again in ' + describeWait(lockedFor) + '.'
+            : 'Incorrect password.'
+        );
+        return;
+      }
+
+      clearFailures();
+
+      // Upgrade a stored plain-text password to a hash on the way through, so
+      // this only has to happen once and nobody has to re-enter anything.
+      if (!isHashed(savedPasswordHash) && canHash() && onPasswordUpgraded) {
+        try {
+          onPasswordUpgraded(await hashPassword(password));
+        } catch (upgradeError) {
+          /* not fatal - the login itself already succeeded */
+        }
+      }
+
       setAdminAuthenticated(true);
       onSuccess();
-    } else {
-      setError(true);
+    } finally {
+      setIsChecking(false);
     }
   };
 
@@ -59,7 +131,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-xl mb-6 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-            <span>Incorrect password. Default is <strong className="font-mono">changeme123</strong>.</span>
+            <span>{error}</span>
           </div>
         )}
 
@@ -76,23 +148,35 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setError(false);
+                  setError('');
                 }}
                 placeholder="Enter admin password..."
                 className="w-full pl-9 pr-4 py-2.5 text-sm border border-stone-200 rounded-xl focus:outline-hidden focus:border-amber-500 font-medium"
               />
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              Initial default password: <code className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-700 font-mono">changeme123</code>
+              Ask your Knowledge Hub administrator if you do not have the password.
             </p>
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-medium py-3 rounded-xl text-sm transition-colors cursor-pointer shadow-md"
+            disabled={isChecking || lockMs > 0}
+            className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 disabled:bg-stone-400 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl text-sm transition-colors cursor-pointer shadow-md"
           >
-            <span>Log In to Admin Panel</span>
-            <ArrowRight className="w-4 h-4 text-amber-400" />
+            {isChecking ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Checking…</span>
+              </>
+            ) : lockMs > 0 ? (
+              <span>Locked — try again in {describeWait(lockMs)}</span>
+            ) : (
+              <>
+                <span>Log In to Admin Panel</span>
+                <ArrowRight className="w-4 h-4 text-amber-400" />
+              </>
+            )}
           </button>
         </form>
       </div>
