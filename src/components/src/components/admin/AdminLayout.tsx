@@ -12,7 +12,7 @@ import {
   Building2, 
   ShieldCheck 
 } from 'lucide-react';
-import { Article, Category, SiteSettings, SupportTicket } from '../../types';
+import { Article, Category, SiteSettings } from '../../types';
 import { AdminDashboard } from './AdminDashboard';
 import { ArticleEditor } from './ArticleEditor';
 import { CategoryManager } from './CategoryManager';
@@ -32,11 +32,9 @@ type AdminTab = 'dashboard' | 'articles' | 'categories' | 'users' | 'analytics' 
 interface AdminLayoutProps {
   articles: Article[];
   categories: Category[];
-  tickets: SupportTicket[];
   settings: SiteSettings;
   onArticlesUpdated: (articles: Article[]) => void;
   onCategoriesUpdated: (categories: Category[]) => void;
-  onTicketsUpdated: (tickets: SupportTicket[]) => void;
   onSettingsUpdated: (settings: SiteSettings) => void;
   onBackToPublicSite: () => void;
   onResetAllData: () => void;
@@ -45,16 +43,18 @@ interface AdminLayoutProps {
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   articles,
   categories,
-  tickets,
   settings,
   onArticlesUpdated,
   onCategoriesUpdated,
-  onTicketsUpdated,
   onSettingsUpdated,
   onBackToPublicSite,
   onResetAllData,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  // Null until the inbox has actually asked the server. The old label read a
+  // localStorage array that could never contain anything, so it always said
+  // "0 open" no matter how many people had written in.
+  const [openTicketCount, setOpenTicketCount] = useState<number | null>(null);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
 
   const handleLogout = () => {
@@ -190,7 +190,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               }`}
             >
               <LifeBuoy className="w-4 h-4" />
-              <span>Tickets ({tickets.filter(t => t.status === 'open').length} open)</span>
+              <span>Tickets{openTicketCount === null ? '' : ' (' + openTicketCount + ' open)'}</span>
             </button>
 
             <button
@@ -252,10 +252,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'analytics' && <ReportingAnalytics />}
 
         {activeTab === 'tickets' && (
-          <SupportTickets
-            tickets={tickets}
-            onTicketsUpdated={onTicketsUpdated}
-          />
+          <SupportTickets onOpenCountChange={setOpenTicketCount} />
         )}
 
         {activeTab === 'settings' && (
