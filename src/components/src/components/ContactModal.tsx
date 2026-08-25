@@ -79,8 +79,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               <LifeBuoy className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-lg">Submit Support Inquiry</h3>
-              <p className="text-slate-400 text-xs">Direct help ticket to NGO Knowledge Hub coordinators</p>
+              <h3 className="font-bold text-lg">Submit your feedback</h3>
+              <p className="text-slate-400 text-xs">Questions, problems or suggestions — straight to the Knowledge Hub team</p>
             </div>
           </div>
           <button
@@ -99,10 +99,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h4 className="text-2xl font-bold text-slate-900 mb-2">
-                Inquiry Submitted Successfully
+                Thank you — your feedback has reached us
               </h4>
               <p className="text-slate-600 text-sm max-w-md mx-auto mb-6">
-                Your reference is <strong className="text-sky-900 font-mono bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">{submittedTicket.ticketId || submittedTicket.id}</strong>. Quote it if you follow up. The request is now with the Knowledge Hub team.
+                Your reference is <strong className="text-sky-900 font-mono bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">{submittedTicket.ticketId || submittedTicket.id}</strong>. Quote it if you follow up. Your message is now with the Knowledge Hub team.
               </p>
 
               <button
@@ -118,7 +118,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
                   <div className="flex items-center gap-1.5 font-semibold mb-1">
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    Your request was not sent
+                    Your feedback was not sent
                   </div>
                   <p className="leading-relaxed">{sendError}</p>
                   {(settings.supportEmail || settings.helplinePhone) && (
@@ -249,7 +249,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
-                      <span>Submit Ticket</span>
+                      <span>Send feedback</span>
                     </>
                   )}
                 </button>

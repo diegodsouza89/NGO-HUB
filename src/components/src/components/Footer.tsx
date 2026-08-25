@@ -41,13 +41,13 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Quick Support Links */}
           <div className="space-y-3">
             <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-              Community Support
+              Feedback &amp; Support
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
                 <button onClick={onOpenContact} className="hover:text-emerald-800 transition-colors cursor-pointer flex items-center gap-1.5 font-medium">
                   <Mail className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Submit Support Ticket</span>
+                  <span>Submit your feedback</span>
                 </button>
               </li>
             </ul>
