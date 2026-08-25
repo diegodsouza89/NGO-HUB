@@ -5,6 +5,8 @@ import {
   FolderTree, 
   LifeBuoy, 
   Settings, 
+  Users2,
+  FileBarChart,
   LogOut, 
   ArrowLeft, 
   Building2, 
@@ -16,7 +18,16 @@ import { ArticleEditor } from './ArticleEditor';
 import { CategoryManager } from './CategoryManager';
 import { SupportTickets } from './SupportTickets';
 import { SettingsManager } from './SettingsManager';
+// These two screens were fully built but never imported anywhere, so the tabs
+// for them did not exist and the dashboard tiles that pointed at them did
+// nothing.
+import { UserManager } from './UserManager';
+import { ReportingAnalytics } from './ReportingAnalytics';
 import { setAdminAuthenticated } from '../../lib/storage';
+
+/** Kept in step with AdminDashboard's onNavigateTab, which already referred to
+ *  'users' and 'analytics' before either tab existed. */
+type AdminTab = 'dashboard' | 'articles' | 'categories' | 'users' | 'analytics' | 'tickets' | 'settings';
 
 interface AdminLayoutProps {
   articles: Article[];
@@ -43,7 +54,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onBackToPublicSite,
   onResetAllData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'articles' | 'categories' | 'tickets' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
 
   const handleLogout = () => {
@@ -139,6 +150,36 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
             <button
               onClick={() => {
+                setActiveTab('users');
+                setEditingArticle(null);
+              }}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 cursor-pointer transition-colors ${
+                activeTab === 'users'
+                  ? 'border-amber-400 text-amber-300 bg-stone-900/80'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <Users2 className="w-4 h-4" />
+              <span>Users</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('analytics');
+                setEditingArticle(null);
+              }}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 cursor-pointer transition-colors ${
+                activeTab === 'analytics'
+                  ? 'border-amber-400 text-amber-300 bg-stone-900/80'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <FileBarChart className="w-4 h-4" />
+              <span>Reports</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setActiveTab('tickets');
                 setEditingArticle(null);
               }}
@@ -205,6 +246,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             onCategoriesUpdated={onCategoriesUpdated}
           />
         )}
+
+        {activeTab === 'users' && <UserManager />}
+
+        {activeTab === 'analytics' && <ReportingAnalytics />}
 
         {activeTab === 'tickets' && (
           <SupportTickets

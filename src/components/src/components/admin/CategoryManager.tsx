@@ -11,6 +11,7 @@ import {
   ArrowDown 
 } from 'lucide-react';
 import { Category, Language, SUPPORTED_LANGUAGES } from '../../types';
+import { CATEGORY_ICONS, CategoryIcon, iconGroups } from '../../lib/categoryIcons';
 import { saveCategories } from '../../lib/storage';
 
 interface CategoryManagerProps {
@@ -26,7 +27,6 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeLangTab, setActiveLangTab] = useState<Language>('en');
 
-  const ICON_OPTIONS = ['Compass', 'Award', 'Receipt', 'Users', 'FileBarChart', 'PhoneCall'];
 
   const handleOpenAdd = () => {
     setEditingCategory({
@@ -135,7 +135,10 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                   </td>
                   <td className="p-4 font-mono text-xs text-stone-600">
                     <span className="font-sans bg-stone-100 px-2 py-1 rounded text-stone-800 font-semibold mr-2">
-                      {cat.icon}
+<span className="inline-flex items-center gap-1.5">
+                        <CategoryIcon name={cat.icon} className="w-4 h-4" />
+                        {cat.icon}
+                      </span>
                     </span>
                     {cat.slug}
                   </td>
@@ -184,22 +187,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
             </div>
 
             <form onSubmit={handleSaveModal} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Icon
-                  </label>
-                  <select
-                    value={editingCategory.icon || 'Compass'}
-                    onChange={(e) => setEditingCategory({ ...editingCategory, icon: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-stone-200 rounded-xl font-medium bg-white"
-                  >
-                    {ICON_OPTIONS.map(i => (
-                      <option key={i} value={i}>{i}</option>
-                    ))}
-                  </select>
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
                     Slug
@@ -225,6 +213,62 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
                     className="w-full px-3 py-2 text-sm border border-stone-200 rounded-xl font-medium"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Icon
+                </label>
+                <div className="flex items-center gap-2 mb-2 text-xs text-stone-500">
+                  <span className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center">
+                    <CategoryIcon name={editingCategory.icon || 'Compass'} className="w-5 h-5" />
+                  </span>
+                  <span>
+                    Currently{' '}
+                    <span className="font-semibold text-stone-800">
+                      {CATEGORY_ICONS[editingCategory.icon] ? editingCategory.icon : 'not set'}
+                    </span>
+                    {!CATEGORY_ICONS[editingCategory.icon] && editingCategory.icon
+                      ? ' — “' + editingCategory.icon + '” is not an icon this site can draw, so the card shows a question mark.'
+                      : ''}
+                  </span>
+                </div>
+
+                <div className="max-h-52 overflow-y-auto rounded-xl border border-stone-200 p-3 space-y-3 bg-stone-50/60">
+                  {iconGroups().map(({ group, names }) => (
+                    <div key={group}>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1.5">
+                        {group}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {names.map((name) => {
+                          const selected = (editingCategory.icon || 'Compass') === name;
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              title={name}
+                              aria-label={name}
+                              aria-pressed={selected}
+                              onClick={() => setEditingCategory({ ...editingCategory, icon: name })}
+                              className={
+                                'w-9 h-9 rounded-xl flex items-center justify-center border transition-colors cursor-pointer ' +
+                                (selected
+                                  ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200'
+                                  : 'border-stone-200 bg-white hover:border-stone-400')
+                              }
+                            >
+                              <CategoryIcon name={name} className="w-4 h-4" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-stone-400 mt-1">
+                  Every icon here is one the public site knows how to draw.
+                </p>
               </div>
 
               {/* Language Tabs for Multi-Language Category Names */}

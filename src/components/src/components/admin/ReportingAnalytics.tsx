@@ -155,8 +155,12 @@ export const ReportingAnalytics: React.FC = () => {
         {/* Visual Bar Chart */}
         <div className="h-48 flex items-end gap-2 pt-6 pb-2 border-b border-slate-200">
           {analytics.days.map((d) => {
-            const loginBarHeight = Math.max((d.logins / maxLogins) * 100, 10);
-            const viewBarHeight = Math.max((d.views / maxViews) * 100, 12);
+            // A day with no activity must draw no bar. The minimum height is
+            // there so a small non-zero value stays visible, but applying it to
+            // zero drew a bar for traffic that never happened - the same
+            // problem the dashboard's invented numbers had.
+            const loginBarHeight = d.logins > 0 ? Math.max((d.logins / maxLogins) * 100, 10) : 0;
+            const viewBarHeight = d.views > 0 ? Math.max((d.views / maxViews) * 100, 12) : 0;
 
             return (
               <div key={d.date} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group">
