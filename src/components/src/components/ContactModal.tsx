@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Send, LifeBuoy, CheckCircle2, Phone, Mail, Clock } from 'lucide-react';
+import { X, Send, LifeBuoy, CheckCircle2, Phone, Mail, Clock, Loader2, AlertTriangle } from 'lucide-react';
 import { Category, SupportTicket, SiteSettings } from '../types';
-import { createTicket } from '../lib/storage';
+import { submitTicket } from '../lib/tickets';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -26,16 +26,25 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   });
 
   const [submittedTicket, setSubmittedTicket] = useState<SupportTicket | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSending) return;
     if (!formData.name || !formData.email || !formData.subject || !formData.message) {
       return;
     }
 
-    const ticket = createTicket({
+    setIsSending(true);
+    setSendError('');
+    // The reference number is only shown once the server confirms the ticket
+    // was stored. The old code wrote to this browser's localStorage and showed
+    // a number immediately, so every request looked successful and none of them
+    // reached anybody.
+    const result = await submitTicket({
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
@@ -43,12 +52,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       categoryId: formData.categoryId,
       message: formData.message,
     });
+    setIsSending(false);
 
-    setSubmittedTicket(ticket);
+    if (!result.ok || !result.data) {
+      if (result.detail) console.warn('[NGO Hub] Ticket submission failed:', result.detail);
+      setSendError(result.error || 'We could not send your request.');
+      return;
+    }
+    setSubmittedTicket(result.data);
   };
 
   const handleReset = () => {
     setSubmittedTicket(null);
+    setSendError('');
     setFormData({ name: '', email: '', phone: '', subject: '', categoryId: '', message: '' });
     onClose();
   };
@@ -86,7 +102,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 Inquiry Submitted Successfully
               </h4>
               <p className="text-slate-600 text-sm max-w-md mx-auto mb-6">
-                Your support ticket ID is <strong className="text-sky-900 font-mono bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">{submittedTicket.id}</strong>. The request has been saved and will appear in the admin support tickets section for review.
+                Your reference is <strong className="text-sky-900 font-mono bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">{submittedTicket.ticketId || submittedTicket.id}</strong>. Quote it if you follow up. The request is now with the Knowledge Hub team.
               </p>
 
               <button
@@ -98,6 +114,30 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {sendError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                  <div className="flex items-center gap-1.5 font-semibold mb-1">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Your request was not sent
+                  </div>
+                  <p className="leading-relaxed">{sendError}</p>
+                  {(settings.supportEmail || settings.helplinePhone) && (
+                    <p className="mt-1.5 leading-relaxed">
+                      Please reach us directly instead
+                      {settings.supportEmail ? (
+                        <>
+                          {' '}at{' '}
+                          <a href={'mailto:' + settings.supportEmail} className="underline font-semibold">
+                            {settings.supportEmail}
+                          </a>
+                        </>
+                      ) : null}
+                      {settings.helplinePhone ? <> on {settings.helplinePhone}</> : null}
+                      , so nothing is lost.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -198,10 +238,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-medium px-5 py-2.5 rounded-xl text-xs shadow-md transition-colors cursor-pointer"
+                  disabled={isSending}
+                  className="flex items-center gap-2 bg-sky-700 hover:bg-sky-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium px-5 py-2.5 rounded-xl text-xs shadow-md transition-colors cursor-pointer"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Submit Ticket</span>
+                  {isSending ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Submit Ticket</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
