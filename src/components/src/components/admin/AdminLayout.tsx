@@ -261,6 +261,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'settings' && (
           <SettingsManager
             settings={settings}
+            categories={categories}
+            articles={articles}
             onSettingsUpdated={onSettingsUpdated}
             onResetData={onResetAllData}
           />

@@ -1,17 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, ShieldCheck, RefreshCcw, Check, BarChart2, AlertTriangle } from 'lucide-react';
-import { SiteSettings } from '../../types';
+import { Settings, Save, ShieldCheck, RefreshCcw, Check, BarChart2, AlertTriangle, Download, UploadCloud } from 'lucide-react';
+import { Article, Category, SiteSettings, SUPPORTED_LANGUAGES } from '../../types';
+import { buildContentJson, downloadContentJson, summariseContent } from '../../lib/exportContent';
 import { saveSettings, resetToDefaults } from '../../lib/storage';
 import { canHash, hashPassword, isDefaultPassword } from '../../lib/adminAuth';
 
 interface SettingsManagerProps {
   settings: SiteSettings;
+  categories: Category[];
+  articles: Article[];
   onSettingsUpdated: (settings: SiteSettings) => void;
   onResetData: () => void;
 }
 
 export const SettingsManager: React.FC<SettingsManagerProps> = ({
   settings,
+  categories,
+  articles,
   onSettingsUpdated,
   onResetData,
 }) => {
@@ -19,6 +24,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [exportState, setExportState] = useState<'idle' | 'done' | 'blocked'>('idle');
   const [usingDefaultPassword, setUsingDefaultPassword] = useState(false);
 
   // Warn while the shipped password is still in force. Checked here rather than
@@ -34,6 +40,8 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   }, [settings.adminPasswordHash]);
 
   const initialFormData = { ...settings, logoUrl: settings.logoUrl || '' };
+  const contentJson = buildContentJson(categories, articles);
+  const summary = summariseContent(categories, articles, contentJson);
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialFormData) || newPassword.trim().length > 0;
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,6 +296,116 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
           </button>
         </div>
       </form>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Publishing. Everything above is stored in this browser only; the    */}
+      {/* file below is what every visitor actually sees.                     */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-2xs mt-6">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-900 border-b border-stone-100 pb-2 flex items-center gap-2">
+          <UploadCloud className="w-4 h-4" />
+          Publish to the live site
+        </h3>
+
+        <p className="text-xs text-stone-500 mt-3 leading-relaxed">
+          Articles and categories you edit here are saved in <strong>this browser only</strong>.
+          Visitors see <code className="bg-stone-100 px-1 py-0.5 rounded">content.json</code> from
+          GitHub, and your local copy is replaced whenever that file changes. Download the file
+          below and upload it to GitHub to publish your work to everyone.
+        </p>
+
+        <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div>
+              <div className="text-lg font-bold text-stone-900">{summary.categories}</div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500">Categories</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-stone-900">{summary.published}</div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500">Published</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-stone-900">{summary.drafts}</div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500">Drafts</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-stone-900">{Math.round(summary.bytes / 1024)} KB</div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500">File size</div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-stone-200">
+            <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-2">
+              Articles with a translated body
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {summary.coverage.map((c) => {
+                const info = SUPPORTED_LANGUAGES.find((l) => l.code === c.code);
+                const complete = c.translated === summary.articles && summary.articles > 0;
+                return (
+                  <span
+                    key={c.code}
+                    title={(info ? info.name : c.code) + ': ' + c.translated + ' of ' + summary.articles}
+                    className={
+                      'px-2 py-0.5 rounded-md text-[11px] font-semibold border ' +
+                      (complete
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : c.translated === 0
+                          ? 'bg-stone-100 border-stone-200 text-stone-400'
+                          : 'bg-amber-50 border-amber-200 text-amber-800')
+                    }
+                  >
+                    {info ? info.nativeName : c.code} {c.translated}/{summary.articles}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            const saved = downloadContentJson(contentJson);
+            setExportState(saved ? 'done' : 'blocked');
+            setTimeout(() => setExportState('idle'), 6000);
+          }}
+          className="mt-4 inline-flex items-center gap-2 bg-emerald-800 hover:bg-emerald-900 text-white font-medium px-5 py-2.5 rounded-xl text-xs shadow-md transition-colors cursor-pointer"
+        >
+          <Download className="w-4 h-4" />
+          <span>Download content.json</span>
+        </button>
+
+        {exportState === 'done' && (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-900">
+            <div className="font-semibold mb-1 flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              Saved. Two steps left:
+            </div>
+            <ol className="list-decimal ml-4 space-y-0.5">
+              <li>
+                Open{' '}
+                <a
+                  href="https://github.com/diegodsouza89/NGO-HUB/upload/main/src/components/src/data"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline font-semibold"
+                >
+                  the data folder on GitHub
+                </a>
+              </li>
+              <li>Drag <code className="bg-white px-1 rounded">content.json</code> in and commit. The site rebuilds in 2–3 minutes.</li>
+            </ol>
+          </div>
+        )}
+
+        {exportState === 'blocked' && (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-900">
+            Your browser blocked the download. Try a normal browser window rather than an
+            in-app one, or allow downloads for this site.
+          </div>
+        )}
+      </div>
     </div>
   );
 };
