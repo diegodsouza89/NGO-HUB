@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight } from 'lucide-react';
+import { Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 
 interface HeroSearchProps {
@@ -165,18 +165,12 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
   };
 
   const showPanel = isOpen && query.trim().length >= 2;
-  const totalResources = articles.filter((a) => a.published).length;
 
   return (
     <div className="relative bg-gradient-to-b from-sky-50 via-blue-50/50 to-slate-50 text-slate-900 py-12 sm:py-16 px-4 sm:px-6 border-b border-slate-200">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-sky-200/50 blur-3xl pointer-events-none rounded-full"></div>
 
       <div className="max-w-4xl mx-auto text-center relative z-10">
-        <div className="inline-flex items-center gap-2 bg-sky-100/80 border border-sky-300 text-sky-950 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide mb-5 shadow-2xs">
-          <Sparkles className="w-3.5 h-3.5 text-sky-700 animate-pulse" />
-          <span>Free &amp; Discounted Technology for Non-Profits</span>
-        </div>
-
         <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-3 leading-tight">
           NGO Knowledge Hub
         </h1>
@@ -204,7 +198,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
               }}
               onFocus={() => setIsOpen(true)}
               onKeyDown={onKeyDown}
-              placeholder={'Search ' + totalResources + ' resources — Google Workspace, cloud credits, CRM, cybersecurity…'}
+              placeholder="Search Google Workspace, cloud credits, CRM, cybersecurity…"
               className="w-full rounded-2xl border border-slate-300 bg-white/95 pl-12 pr-11 py-3.5 text-sm sm:text-base text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100 transition"
             />
             {query && (

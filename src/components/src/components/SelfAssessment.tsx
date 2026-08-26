@@ -14,6 +14,7 @@ import {
   ASSESSMENT,
   allQuestions,
   scoreAssessment,
+  uiText,
   TONE_CLASSES,
 } from '../lib/assessment';
 import { pickLang } from '../lib/search';
@@ -43,6 +44,10 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
   const lang = currentLanguage;
   const text = (map: Record<string, string> | Partial<Record<Language, string>>, fallback = '') =>
     pickLang(map as Partial<Record<Language, string>>, lang, fallback);
+  // Screen labels come from assessment.json too, so they can be reworded and
+  // translated without a code change.
+  const ui = (key: string, fallback: string, vars?: Record<string, string | number>) =>
+    uiText(key, lang, fallback, vars);
 
   const result = useMemo(
     () => scoreAssessment(answers, articles, categories, lang),
@@ -78,7 +83,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-6 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Back to the Knowledge Hub
+          {ui('backToHub', 'Back to the Knowledge Hub')}
         </button>
 
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 sm:p-10">
@@ -131,7 +136,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
             {text(currentArea.names, currentArea.id)}
           </span>
           <span className="text-xs text-slate-500 font-medium">
-            {index + 1} of {questions.length}
+            {ui('questionCount', '{current} of {total}', { current: index + 1, total: questions.length })}
           </span>
         </div>
 
@@ -185,7 +190,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            Back
+            {ui('back', 'Back')}
           </button>
 
           {answeredCurrent && index + 1 < questions.length && (
@@ -193,7 +198,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
               onClick={() => setIndex(index + 1)}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 hover:text-sky-900 cursor-pointer"
             >
-              Next
+              {ui('next', 'Next')}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -202,7 +207,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
               onClick={() => setStage('results')}
               className="inline-flex items-center gap-1.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white px-4 py-2 text-xs font-semibold cursor-pointer"
             >
-              See my results
+              {ui('seeResults', 'See my results')}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -221,7 +226,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-6 cursor-pointer"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
-        Back to the Knowledge Hub
+        {ui('backToHub', 'Back to the Knowledge Hub')}
       </button>
 
       {/* Headline score */}
@@ -229,7 +234,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Your result
+              {ui('yourResult', 'Your result')}
             </div>
             <h1 className={'text-2xl sm:text-3xl font-extrabold tracking-tight ' + tone.text}>
               {result.bandLabel}
@@ -241,7 +246,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
               <span className="text-base font-bold text-slate-400">/{result.max}</span>
             </div>
             <div className="text-[11px] text-slate-500 font-medium">
-              {result.answered} of {result.total} answered
+              {ui('answered', '{done} of {total} answered', { done: result.answered, total: result.total })}
             </div>
           </div>
         </div>
@@ -250,16 +255,17 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
 
         {result.unsureCount > 0 && (
           <p className="text-xs text-slate-600 leading-relaxed mt-3 border-t border-white/60 pt-3">
-            You answered <strong>“not sure”</strong> {result.unsureCount}{' '}
-            {result.unsureCount === 1 ? 'time' : 'times'}. Those count as zero here, but they are
-            worth more attention than a plain “not started” — nobody knowing who owns a system is
-            itself the risk.
+            {ui(
+              'unsureNote',
+              'You answered “I am not sure” {count} times. Those count as zero here, but they matter more than a plain no.',
+              { count: result.unsureCount }
+            )}
           </p>
         )}
       </div>
 
       {/* Area breakdown */}
-      <h2 className="text-lg font-bold text-slate-900 mt-8 mb-3">Area by area</h2>
+      <h2 className="text-lg font-bold text-slate-900 mt-8 mb-3">{ui('areaByArea', 'Area by area')}</h2>
       <div className="space-y-3">
         {result.areas.map((areaResult) => {
           const t = TONE_CLASSES[areaResult.tone];
@@ -299,17 +305,19 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
       </div>
 
       {/* What to do next */}
-      <h2 className="text-lg font-bold text-slate-900 mt-8 mb-1">Where to start</h2>
+      <h2 className="text-lg font-bold text-slate-900 mt-8 mb-1">{ui('whereToStart', 'Where to start')}</h2>
       {result.priorities.length === 0 ? (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-sm text-emerald-900 leading-relaxed">
-          Nothing here is scoring badly, so there is no single weak spot to point you at. The
-          programmes and credits in this Hub are still worth a look — a lot go unclaimed simply
-          because nobody applied.
+          {ui('allGood', 'Nothing is scoring badly, so there is no single weak spot to point you at.')}
         </div>
       ) : (
         <>
           <p className="text-xs text-slate-500 mb-3">
-            Your {result.priorities.length === 1 ? 'weakest area' : result.priorities.length + ' weakest areas'}, and the guides here that address {result.priorities.length === 1 ? 'it' : 'them'}.
+            {result.priorities.length === 1
+              ? ui('weakestOne', 'Your weakest area, and the guides here that help with it.')
+              : ui('weakestMany', 'Your {count} weakest areas, and the guides here that help with them.', {
+                  count: result.priorities.length,
+                })}
           </p>
           <div className="space-y-4">
             {result.priorities.map((p, rank) => (
@@ -343,7 +351,7 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
                   </div>
                 ) : (
                   <div className="text-xs text-slate-500">
-                    No guide covers this area yet.
+                    {ui('noGuide', 'No guide covers this yet.')}
                     {p.categories.length > 0 && (
                       <>
                         {' '}
@@ -351,7 +359,9 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
                           onClick={() => onSelectCategory(p.categories[0])}
                           className="underline font-semibold text-sky-700 cursor-pointer"
                         >
-                          Browse {text(p.categories[0].names, 'the category')}
+                          {ui('browse', 'Browse {name}', {
+                            name: text(p.categories[0].names, 'the category'),
+                          })}
                         </button>
                       </>
                     )}
@@ -369,19 +379,19 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2.5 text-xs font-semibold cursor-pointer"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          Start again
+          {ui('startAgain', 'Start again')}
         </button>
         <button
           onClick={onExit}
           className="inline-flex items-center gap-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white px-4 py-2.5 text-xs font-semibold cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          Browse all guides
+          {ui('browseAll', 'Browse all guides')}
         </button>
       </div>
 
       <p className="text-[11px] text-slate-400 leading-relaxed mt-5">
-        {text(ASSESSMENT.notes)} Your answers stay in this browser and are not sent anywhere.
+        {text(ASSESSMENT.notes)} {ui('privacy', 'Your answers stay in this browser and are not sent anywhere.')}
       </p>
     </section>
   );

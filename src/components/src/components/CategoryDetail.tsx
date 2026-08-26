@@ -27,7 +27,7 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
   onBackToHome,
 }) => {
   const [catSearch, setCatSearch] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'articles'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'articles'>('articles');
 
   const catName = category.names[currentLanguage] || category.names.en;
   const catDesc = category.descriptions[currentLanguage] || category.descriptions.en;
@@ -81,16 +81,6 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
 
       <div className="flex flex-wrap items-center gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
         <button
-          onClick={() => setActiveSubTab('overview')}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-            activeSubTab === 'overview'
-              ? 'bg-white text-sky-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Overview
-        </button>
-        <button
           onClick={() => setActiveSubTab('articles')}
           className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
             activeSubTab === 'articles'
@@ -99,6 +89,16 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
           }`}
         >
           Knowledge Articles
+        </button>
+        <button
+          onClick={() => setActiveSubTab('overview')}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+            activeSubTab === 'overview'
+              ? 'bg-white text-sky-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Overview
         </button>
       </div>
 
