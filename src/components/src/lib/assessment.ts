@@ -39,8 +39,11 @@ interface Band {
   tone: 'risk' | 'warn' | 'ok' | 'strong';
 }
 
+type LangMap = Partial<Record<Language, string>>;
+
 interface Definition {
   version: number;
+  ui?: Record<string, LangMap>;
   titles: Partial<Record<Language, string>>;
   intros: Partial<Record<Language, string>>;
   startLabels: Partial<Record<Language, string>>;
@@ -52,6 +55,29 @@ interface Definition {
 }
 
 export const ASSESSMENT = definition as unknown as Definition;
+
+/**
+ * On-screen labels, read from assessment.json so the wording can be changed or
+ * translated without touching code. `vars` fills placeholders like {count}.
+ *
+ * Falls back to the supplied English if a key is missing, so an incomplete
+ * translation degrades to English rather than showing a blank or a key name.
+ */
+export function uiText(
+  key: string,
+  lang: Language,
+  fallback: string,
+  vars?: Record<string, string | number>
+): string {
+  const map = (ASSESSMENT.ui || {})[key];
+  let out = map ? pickLang(map, lang, fallback) : fallback;
+  if (vars) {
+    for (const name of Object.keys(vars)) {
+      out = out.split('{' + name + '}').join(String(vars[name]));
+    }
+  }
+  return out;
+}
 
 /** Every question, flattened, in the order they are asked. */
 export interface FlatQuestion extends AssessmentQuestion {
