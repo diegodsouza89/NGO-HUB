@@ -1,118 +1,84 @@
 {
-  "version": 1,
+  "version": 2,
   "titles": {
-    "en": "Where does your NGO stand on technology?"
+    "en": "How is your NGO doing with technology?"
   },
   "intros": {
-    "en": "Ten questions, about three minutes. You will get a picture of where your organisation is strong and where it is exposed, and the guides from this Hub that address your weakest areas first. Nothing is saved unless you choose to save it at the end."
+    "en": "Ten quick questions, about three minutes. You will see where your organisation is doing well, where the gaps are, and which guides here will help most. Nothing is saved unless you choose to save it."
   },
   "startLabels": {
     "en": "Begin self-assessment"
   },
   "notes": {
-    "en": "This is a self-assessment, not an audit. It reflects what you tell it, and each area rests on two questions — treat it as a prompt for a conversation, not a verdict."
+    "en": "This is a quick self-check, not an audit. It only knows what you tell it, and each area has just two questions — so treat it as a starting point for a conversation."
+  },
+  "ui": {
+    "back": { "en": "Back" },
+    "next": { "en": "Next" },
+    "seeResults": { "en": "See my results" },
+    "backToHub": { "en": "Back to the Knowledge Hub" },
+    "yourResult": { "en": "Your result" },
+    "answered": { "en": "{done} of {total} answered" },
+    "questionCount": { "en": "{current} of {total}" },
+    "areaByArea": { "en": "Area by area" },
+    "whereToStart": { "en": "Where to start" },
+    "weakestOne": { "en": "Your weakest area, and the guides here that help with it." },
+    "weakestMany": { "en": "Your {count} weakest areas, and the guides here that help with them." },
+    "allGood": {
+      "en": "Nothing is scoring badly, so there is no single weak spot to point you at. The free programmes in this Hub are still worth a look — many go unclaimed simply because nobody applied."
+    },
+    "noGuide": { "en": "No guide covers this yet." },
+    "browse": { "en": "Browse {name}" },
+    "startAgain": { "en": "Start again" },
+    "browseAll": { "en": "Browse all guides" },
+    "unsureNote": {
+      "en": "You answered “I am not sure” {count} times. Those count as zero here, but they matter more than a plain no — if nobody knows who looks after something, that is the gap."
+    },
+    "privacy": { "en": "Your answers stay in this browser and are not sent anywhere." }
   },
   "options": [
-    {
-      "value": 0,
-      "labels": {
-        "en": "Not started"
-      }
-    },
-    {
-      "value": 1,
-      "labels": {
-        "en": "Started, informally"
-      }
-    },
-    {
-      "value": 2,
-      "labels": {
-        "en": "Mostly in place"
-      }
-    },
-    {
-      "value": 3,
-      "labels": {
-        "en": "Fully in place"
-      }
-    },
-    {
-      "value": 0,
-      "labels": {
-        "en": "Not sure"
-      },
-      "unsure": true
-    }
+    { "value": 0, "labels": { "en": "No, not yet" } },
+    { "value": 1, "labels": { "en": "We have started" } },
+    { "value": 2, "labels": { "en": "Mostly done" } },
+    { "value": 3, "labels": { "en": "Yes, fully" } },
+    { "value": 0, "labels": { "en": "I am not sure" }, "unsure": true }
   ],
   "areaBands": [
-    {
-      "max": 1,
-      "labels": {
-        "en": "Needs attention"
-      },
-      "tone": "risk"
-    },
-    {
-      "max": 3,
-      "labels": {
-        "en": "In progress"
-      },
-      "tone": "warn"
-    },
-    {
-      "max": 5,
-      "labels": {
-        "en": "Good"
-      },
-      "tone": "ok"
-    },
-    {
-      "max": 6,
-      "labels": {
-        "en": "Strong"
-      },
-      "tone": "strong"
-    }
+    { "max": 1, "labels": { "en": "Needs work" }, "tone": "risk" },
+    { "max": 3, "labels": { "en": "Getting there" }, "tone": "warn" },
+    { "max": 5, "labels": { "en": "Good" }, "tone": "ok" },
+    { "max": 6, "labels": { "en": "Very strong" }, "tone": "strong" }
   ],
   "overallBands": [
     {
       "max": 9,
-      "labels": {
-        "en": "Getting started"
-      },
+      "labels": { "en": "Just beginning" },
       "summaries": {
-        "en": "Most of the basics are still ahead of you. That is a normal place to be, and the good news is that the early steps are the cheapest — verification, email on your own domain, and two-factor authentication unlock most of the free programmes and remove most of the risk."
+        "en": "Most of the basics are still ahead of you. That is a normal place to be, and the first steps are the cheapest ones: register for free software, get email with your own name on it, and turn on the phone code at login."
       },
       "tone": "risk"
     },
     {
       "max": 17,
-      "labels": {
-        "en": "Building foundations"
-      },
+      "labels": { "en": "Making progress" },
       "summaries": {
-        "en": "You have some pieces working and others missing. The value now is in closing the gaps rather than adding new tools — particularly anywhere your answers were 'not sure', since nobody owning a system is its own risk."
+        "en": "Some things are working and some are missing. The most useful work now is closing the gaps rather than adding new tools — especially anywhere you answered “not sure”."
       },
       "tone": "warn"
     },
     {
       "max": 24,
-      "labels": {
-        "en": "Solid footing"
-      },
+      "labels": { "en": "In good shape" },
       "summaries": {
-        "en": "The essentials are largely in place. From here the gains come from consolidation: one system rather than several, tested backups rather than assumed ones, and reporting you can produce without rebuilding it by hand."
+        "en": "The basics are mostly in place. From here the gains come from tidying up: one system instead of several, backups you have actually tested, and reports you can produce without starting over."
       },
       "tone": "ok"
     },
     {
       "max": 30,
-      "labels": {
-        "en": "Well established"
-      },
+      "labels": { "en": "Very strong" },
       "summaries": {
-        "en": "You are ahead of most organisations of your size. The remaining work is depth rather than breadth — the programmes and credits in this Hub are worth checking anyway, since many go unclaimed simply because nobody applied."
+        "en": "You are ahead of most organisations your size. The free programmes here are still worth checking — a lot go unclaimed simply because nobody applied."
       },
       "tone": "strong"
     }
@@ -120,106 +86,86 @@
   "areas": [
     {
       "id": "foundations",
-      "names": {
-        "en": "Foundations & eligibility"
-      },
+      "names": { "en": "Getting free software" },
       "descriptions": {
-        "en": "Whether you can actually claim the free and discounted programmes you are entitled to."
+        "en": "Whether you can claim the free and low-cost software your NGO is entitled to."
       },
-      "categoryIds": [
-        "cat-4558"
-      ],
+      "categoryIds": ["cat-4558"],
       "advice": {
-        "en": "Almost every nonprofit programme starts with one validation step. Doing it once unlocks many of them."
+        "en": "Most free software programmes start with one check of your NGO's registration. Do it once and many of them open up."
       },
       "questions": [
         {
           "id": "f1",
           "prompts": {
-            "en": "Has your organisation been verified with a nonprofit validation service such as TechSoup or Goodstack?"
+            "en": "Have you registered your NGO with TechSoup or Goodstack, so you can claim free software?"
           }
         },
         {
           "id": "f2",
           "prompts": {
-            "en": "Do you keep your registration documents together and ready when applying for a nonprofit programme?"
+            "en": "Do you keep your registration papers together, so applying is quick when you need to?"
           }
         }
       ]
     },
     {
       "id": "workspace",
-      "names": {
-        "en": "Workspace & productivity"
-      },
+      "names": { "en": "Email and files" },
       "descriptions": {
-        "en": "Email, documents and the everyday tools your team shares."
+        "en": "The email and file tools your team uses every day."
       },
-      "categoryIds": [
-        "cat-tech-grants",
-        "cat-9438"
-      ],
+      "categoryIds": ["cat-tech-grants", "cat-9438"],
       "advice": {
-        "en": "Email on your own domain and shared organisation-owned files are the difference between a team and a group of individuals."
+        "en": "Email with your own name on it looks professional to funders. And files kept in the organisation's account do not walk out of the door when someone leaves."
       },
       "questions": [
         {
           "id": "w1",
           "prompts": {
-            "en": "Does everyone on your team have an email address on your organisation's own domain, rather than a personal Gmail or Yahoo account?"
+            "en": "Does your team use email addresses with your organisation's own name, instead of personal Gmail accounts?"
           }
         },
         {
           "id": "w2",
           "prompts": {
-            "en": "Are shared documents kept in an account the organisation controls, so they stay accessible when someone leaves?"
+            "en": "Are shared files kept in the organisation's own account, so nothing is lost when someone leaves?"
           }
         }
       ]
     },
     {
       "id": "security",
-      "names": {
-        "en": "Security & resilience"
-      },
+      "names": { "en": "Safety and backups" },
       "descriptions": {
-        "en": "Protecting accounts and data, and being able to get them back."
+        "en": "Keeping accounts safe, and being able to get your files back."
       },
-      "categoryIds": [
-        "cat-8222",
-        "cat-2967",
-        "cat-9701"
-      ],
+      "categoryIds": ["cat-8222", "cat-2967", "cat-9701"],
       "advice": {
-        "en": "Two-factor authentication stops most account takeovers and costs nothing. And a backup nobody has restored is a hope, not a backup."
+        "en": "A code on your phone at login stops most break-ins and costs nothing. And a backup nobody has ever opened is only a hope."
       },
       "questions": [
         {
           "id": "s1",
           "prompts": {
-            "en": "Is two-factor authentication switched on for email and for every account holding beneficiary data?"
+            "en": "When you log in, do your accounts ask for a code on your phone as well as a password?"
           }
         },
         {
           "id": "i2",
           "prompts": {
-            "en": "Are your important files and databases backed up automatically, with a restore someone has actually tested?"
+            "en": "Are your important files backed up automatically — and has anyone checked the backup really works?"
           }
         }
       ]
     },
     {
       "id": "outreach",
-      "names": {
-        "en": "Outreach & digital presence"
-      },
+      "names": { "en": "Website and reaching people" },
       "descriptions": {
-        "en": "How supporters, funders and communities find and hear from you."
+        "en": "How funders, supporters and communities find you and hear from you."
       },
-      "categoryIds": [
-        "cat-5421",
-        "cat-2894"
-      ],
+      "categoryIds": ["cat-5421", "cat-2894"],
       "advice": {
         "en": "A funder will look you up before they reply to you. Make sure what they find is current."
       },
@@ -227,44 +173,38 @@
         {
           "id": "o1",
           "prompts": {
-            "en": "Could a funder understand your current work from your website as it stands today?"
+            "en": "If a funder opened your website today, would it show the work you are doing now?"
           }
         },
         {
           "id": "o2",
           "prompts": {
-            "en": "Do you reach supporters and communities through a managed channel — bulk email, SMS or a business WhatsApp account — rather than staff personal phones?"
+            "en": "Do you message supporters from an organisation account, rather than from staff members' own phones?"
           }
         }
       ]
     },
     {
       "id": "data",
-      "names": {
-        "en": "Programme data & reporting"
-      },
+      "names": { "en": "Data and reports" },
       "descriptions": {
-        "en": "Turning what you do into numbers you can stand behind."
+        "en": "Keeping your programme records in order, and getting reports out of them."
       },
-      "categoryIds": [
-        "cat-9641",
-        "cat-3829",
-        "cat-6732"
-      ],
+      "categoryIds": ["cat-9641", "cat-3829", "cat-6732"],
       "advice": {
-        "en": "If reporting means rebuilding the numbers each time, the problem is where the data sits, not how hard people work."
+        "en": "If every report means rebuilding the numbers, the problem is where the data sits — not how hard your team works."
       },
       "questions": [
         {
           "id": "d1",
           "prompts": {
-            "en": "Is your programme and beneficiary data held in one shared system, rather than spread across separate spreadsheets?"
+            "en": "Is your programme data kept in one place your team shares, instead of many separate spreadsheets?"
           }
         },
         {
           "id": "d2",
           "prompts": {
-            "en": "Can you produce a funder report from your own records without reassembling the numbers by hand?"
+            "en": "When a report is due, can you get the numbers out without redoing the work by hand?"
           }
         }
       ]
