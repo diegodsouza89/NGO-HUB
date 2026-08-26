@@ -124,13 +124,13 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     const lines = content.split('\n');
     return lines.map((line, idx) => {
       if (line.startsWith('### ')) {
-        return <h3 key={idx} className="text-xl font-bold text-slate-900 mt-6 mb-3 border-b border-slate-100 pb-2">{line.replace('### ', '')}</h3>;
+        return <h3 key={idx} className="text-xl font-bold text-slate-900 mt-6 mb-3 border-b border-slate-100 pb-2">{formatInlineMarkdown(line.replace('### ', ''))}</h3>;
       }
       if (line.startsWith('## ')) {
-        return <h2 key={idx} className="text-2xl font-bold text-slate-900 mt-8 mb-4 border-b border-slate-200 pb-2">{line.replace('## ', '')}</h2>;
+        return <h2 key={idx} className="text-2xl font-bold text-slate-900 mt-8 mb-4 border-b border-slate-200 pb-2">{formatInlineMarkdown(line.replace('## ', ''))}</h2>;
       }
       if (line.startsWith('# ')) {
-        return <h1 key={idx} className="text-3xl font-bold text-slate-900 mt-8 mb-4">{line.replace('# ', '')}</h1>;
+        return <h1 key={idx} className="text-3xl font-bold text-slate-900 mt-8 mb-4">{formatInlineMarkdown(line.replace('# ', ''))}</h1>;
       }
       if (line.startsWith('1. ') || line.startsWith('2. ') || line.startsWith('3. ') || line.startsWith('4. ')) {
         const itemText = line.replace(/^\d+\.\s*/, '');
@@ -163,14 +163,163 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     });
   };
 
-  const formatInlineMarkdown = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>;
-      }
-      return part;
+  /**
+   * Only http, https and mailto may become a link.
+   *
+   * Article bodies can be edited in the /staff portal and arrive from
+   * content.json, so this is untrusted input as far as the browser is
+   * concerned. Without this check a body containing javascript:... would turn
+   * into a link that runs code when a visitor clicks it.
+   */
+  const safeHref = (url: string): string | null => {
+    const trimmed = String(url || '').trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^mailto:/i.test(trimmed)) return trimmed;
+    // A bare address like www.example.org or someone@example.org.
+    if (/^www\./i.test(trimmed)) return 'https://' + trimmed;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return 'mailto:' + trimmed;
+    return null;
+  };
+
+  const linkClass =
+    'text-sky-700 underline decoration-sky-300 underline-offset-2 hover:text-sky-900 hover:decoration-sky-600 break-words';
+
+  /**
+   * Emit text with bold applied, carrying the open/closed state across calls.
+   *
+   * The state matters because links are extracted first, so a line like
+   *   A **bold [link](https://x.org) inside** it
+   * arrives here as three separate pieces. Without a running state the ** that
+   * opens in the first piece never meets the ** that closes in the third, and
+   * both markers end up printed on the page.
+   */
+  const emitText = (
+    text: string,
+    state: { bold: boolean },
+    keyPrefix: string
+  ): React.ReactNode[] => {
+    const out: React.ReactNode[] = [];
+    text.split('**').forEach((piece, i) => {
+      if (i > 0) state.bold = !state.bold;
+      if (!piece) return;
+      out.push(
+        state.bold ? (
+          <strong key={keyPrefix + 'b' + i} className="font-semibold text-slate-900">
+            {piece}
+          </strong>
+        ) : (
+          <React.Fragment key={keyPrefix + 't' + i}>{piece}</React.Fragment>
+        )
+      );
     });
+    return out;
+  };
+
+  const wrapBold = (node: React.ReactNode, bold: boolean, key: string) =>
+    bold ? (
+      <strong key={key} className="font-semibold text-slate-900">
+        {node}
+      </strong>
+    ) : (
+      node
+    );
+
+  /** Bare web and email addresses become links. Trailing punctuation stays out. */
+  const autoLink = (
+    text: string,
+    state: { bold: boolean },
+    keyPrefix: string
+  ): React.ReactNode[] => {
+    const pattern = /(https?:\/\/[^\s<>()]+|www\.[^\s<>()]+|[^\s<>()]+@[^\s<>()]+\.[a-z]{2,})/gi;
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      let raw = match[0];
+      let trailing = '';
+      const trail = raw.match(/[.,;:!?)\]}'"\u2019\u201d]+$/);
+      if (trail) {
+        trailing = trail[0];
+        raw = raw.slice(0, -trailing.length);
+      }
+      const href = safeHref(raw);
+      if (match.index > last) {
+        out.push(...emitText(text.slice(last, match.index), state, keyPrefix + 'p' + match.index));
+      }
+      if (href) {
+        out.push(
+          wrapBold(
+            <a
+              key={keyPrefix + 'a' + match.index}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkClass}
+            >
+              {raw}
+            </a>,
+            state.bold,
+            keyPrefix + 'w' + match.index
+          )
+        );
+      } else {
+        out.push(...emitText(raw, state, keyPrefix + 'r' + match.index));
+      }
+      if (trailing) out.push(...emitText(trailing, state, keyPrefix + 'q' + match.index));
+      last = match.index + match[0].length;
+    }
+    if (last < text.length) out.push(...emitText(text.slice(last), state, keyPrefix + 'e'));
+    return out;
+  };
+
+  /**
+   * Inline formatting for article bodies: [text](url) links, bare addresses,
+   * and **bold**.
+   *
+   * The old version understood only bold, so a markdown link showed on the page
+   * as the literal characters [text](https://...) and a plain address was not
+   * clickable at all.
+   */
+  const formatInlineMarkdown = (text: string) => {
+    const linkPattern = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+    const state = { bold: false };
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = linkPattern.exec(text)) !== null) {
+      if (match.index > last) {
+        out.push(...autoLink(text.slice(last, match.index), state, 'x' + match.index));
+      }
+      const label = match[1];
+      const href = safeHref(match[2]);
+      if (href) {
+        const inner = { bold: false };
+        out.push(
+          wrapBold(
+            <a
+              key={'l' + match.index}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkClass}
+            >
+              {emitText(label, inner, 'li' + match.index)}
+            </a>,
+            state.bold,
+            'lw' + match.index
+          )
+        );
+      } else {
+        // Not a scheme we will link to. Show the label as text rather than
+        // leaving brackets and a payload on the page.
+        out.push(...emitText(label, state, 'u' + match.index));
+      }
+      last = match.index + match[0].length;
+    }
+
+    if (last < text.length) out.push(...autoLink(text.slice(last), state, 'end'));
+    return out;
   };
 
   return (
