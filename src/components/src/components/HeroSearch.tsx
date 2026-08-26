@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Search, X, FileText, Layers, CornerDownLeft } from 'lucide-react';
+import { Sparkles, Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 
 interface HeroSearchProps {
@@ -11,6 +11,7 @@ interface HeroSearchProps {
   tagline: string;
   selectedResourceType: string;
   onSelectResourceType: (type: string) => void;
+  onStartAssessment?: () => void;
 }
 
 type Hit =
@@ -53,6 +54,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
   onSelectArticle,
   onSelectCategory,
   tagline,
+  onStartAssessment,
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -280,6 +282,23 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
             </div>
           )}
         </div>
+
+        {onStartAssessment && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={onStartAssessment}
+              className="inline-flex items-center gap-2 rounded-2xl border border-sky-300 bg-white/90 hover:bg-sky-50 hover:border-sky-500 text-sky-900 font-semibold px-5 py-2.5 text-sm shadow-2xs transition-colors cursor-pointer"
+            >
+              <ClipboardCheck className="w-4 h-4 text-sky-700" />
+              <span>Begin self-assessment</span>
+              <ArrowRight className="w-4 h-4 text-sky-700" />
+            </button>
+            <span className="text-[11px] text-slate-500">
+              10 questions, about 3 minutes — see where your NGO stands and what to read first
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
