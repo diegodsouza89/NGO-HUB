@@ -155,8 +155,55 @@ export function getArticles(): Article[] {
   }
 }
 
+/**
+ * Raised when article content could not be written to this browser.
+ *
+ * This used to be an unguarded localStorage.setItem — the only write in this
+ * file without a try/catch. When it threw, the exception died inside the React
+ * click handler: the editor showed no error, and an admin who had just
+ * translated an article into seven languages had no way to know the save had
+ * not happened.
+ */
+export class ArticleSaveError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ArticleSaveError';
+  }
+}
+
+/**
+ * Writes the articles, then reads them back to prove the write took effect.
+ *
+ * The read-back matters because a browser can accept setItem and still not
+ * keep the data — a storage quota reached part-way, or an extension or privacy
+ * mode intercepting writes. Without it, "no exception" was being treated as
+ * "saved".
+ */
 export function saveArticles(articles: Article[]): void {
-  localStorage.setItem(KEYS.ARTICLES, JSON.stringify(articles));
+  const payload = JSON.stringify(articles);
+
+  try {
+    localStorage.setItem(KEYS.ARTICLES, payload);
+  } catch (err) {
+    const size = Math.round(payload.length / 1024);
+    const quota =
+      err instanceof DOMException &&
+      (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+    throw new ArticleSaveError(
+      quota
+        ? 'This browser has run out of storage space for the Hub (tried to save ' +
+          size +
+          ' KB). Export content.json to keep your work, then clear older Hub data.'
+        : 'This browser refused to save the articles: ' + String((err as Error)?.message || err)
+    );
+  }
+
+  if (localStorage.getItem(KEYS.ARTICLES) !== payload) {
+    throw new ArticleSaveError(
+      'The save did not stick. This browser accepted the write but did not keep it, ' +
+        'which happens in private or incognito windows and when storage is full.'
+    );
+  }
 }
 
 export function getArticleBySlug(slug: string): Article | undefined {
