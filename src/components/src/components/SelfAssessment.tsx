@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ClipboardCheck,
   ArrowRight,
@@ -8,6 +9,7 @@ import {
   HelpCircle,
   Check,
   Sparkles,
+  Printer,
 } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 import {
@@ -40,6 +42,8 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
   const [stage, setStage] = useState<'intro' | 'asking' | 'results'>('intro');
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  /** Optional, so a report shared with a board or funder says whose it is. */
+  const [orgName, setOrgName] = useState('');
 
   const lang = currentLanguage;
   const text = (map: Record<string, string> | Partial<Record<Language, string>>, fallback = '') =>
@@ -373,6 +377,52 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
         </>
       )}
 
+      {/* Take a copy away.
+          A printable page rather than a generated PDF: it needs no extra
+          library on a page every visitor loads, it works on a phone (both
+          mobile browsers offer Save as PDF from the share sheet), and it is
+          the same button whether they want paper or a file. */}
+      <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start gap-2.5 mb-3">
+          <FileText className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              {ui('reportTitle', 'Take a copy of this report')}
+            </h2>
+            <p className="text-xs text-slate-500 leading-6 mt-0.5">
+              {ui(
+                'reportHelp',
+                'Opens a clean one-page version you can print, or save as a PDF to send to your board or a funder.'
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <label className="flex-1 min-w-0">
+            <span className="block text-[11px] font-semibold text-slate-600 mb-1">
+              {ui('orgNameLabel', 'Organisation name (optional)')}
+            </span>
+            <input
+              type="text"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              placeholder={ui('orgNamePlaceholder', 'Shown at the top of the report')}
+              maxLength={120}
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-sky-500"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 text-xs font-semibold cursor-pointer shrink-0"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            {ui('printReport', 'Print or save as PDF')}
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 mt-8">
         <button
           onClick={restart}
@@ -393,6 +443,139 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
       <p className="text-[11px] text-slate-400 leading-relaxed mt-5">
         {text(ASSESSMENT.notes)} {ui('privacy', 'Your answers stay in this browser and are not sent anywhere.')}
       </p>
+
+      {/*
+        The printable report.
+
+        It is rendered into document.body through a portal so that the print
+        rules can simply hide every other direct child of the body. The first
+        version instead left the page in place and hid it with
+        visibility:hidden, which does not remove its layout — the report came
+        out correct but followed by three blank sheets of paper.
+      */}
+      {createPortal(
+        <>
+          <style>{`
+            #ngo-assessment-report { display: none; }
+            @media print {
+              html, body { height: auto !important; margin: 0 !important; padding: 0 !important; }
+              body > *:not(#ngo-assessment-report) { display: none !important; }
+              #ngo-assessment-report {
+                display: block !important;
+                font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+                color: #0f172a;
+              }
+              #ngo-assessment-report table { page-break-inside: auto; }
+              #ngo-assessment-report tr { page-break-inside: avoid; }
+              @page { margin: 16mm; }
+            }
+          `}</style>
+
+          <div id="ngo-assessment-report" aria-hidden="true">
+        <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '10px', marginBottom: '18px' }}>
+          <div style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748b' }}>
+            {ui('reportKicker', 'NGO Knowledge Hub — technology self-assessment')}
+          </div>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, margin: '6px 0 0' }}>
+            {orgName.trim() || ui('reportNoName', 'Technology readiness report')}
+          </h1>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            {ui('reportDate', 'Completed {date}', { date: new Date().toLocaleDateString() })}
+            {' · '}
+            {ui('answered', '{done} of {total} answered', { done: result.answered, total: result.total })}
+          </div>
+        </div>
+
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: '8px 0', fontSize: '13px', fontWeight: 700 }}>
+                {ui('yourResult', 'Your result')}
+              </td>
+              <td style={{ padding: '8px 0', fontSize: '13px', textAlign: 'right' }}>
+                {result.bandLabel} — {result.score}/{result.max}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p style={{ fontSize: '12.5px', lineHeight: 1.6, margin: '0 0 6px' }}>{result.summary}</p>
+
+        {result.unsureCount > 0 && (
+          <p style={{ fontSize: '11.5px', lineHeight: 1.6, color: '#475569', margin: '0 0 14px' }}>
+            {ui(
+              'unsureNote',
+              'You answered “I am not sure” {count} times. Those count as zero here, but they matter more than a plain no.',
+              { count: result.unsureCount }
+            )}
+          </p>
+        )}
+
+        <h2 style={{ fontSize: '14px', fontWeight: 700, margin: '18px 0 6px' }}>
+          {ui('areaByArea', 'Area by area')}
+        </h2>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1', padding: '6px 0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
+                {ui('reportColArea', 'Area')}
+              </th>
+              <th style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1', padding: '6px 0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
+                {ui('reportColStanding', 'Where you stand')}
+              </th>
+              <th style={{ textAlign: 'right', borderBottom: '1px solid #cbd5e1', padding: '6px 0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
+                {ui('reportColScore', 'Score')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.areas.map((a) => (
+              <tr key={a.area.id}>
+                <td style={{ padding: '7px 8px 7px 0', borderBottom: '1px solid #e2e8f0', fontWeight: 600 }}>
+                  {text(a.area.names, a.area.id)}
+                </td>
+                <td style={{ padding: '7px 8px 7px 0', borderBottom: '1px solid #e2e8f0' }}>{a.bandLabel}</td>
+                <td style={{ padding: '7px 0', borderBottom: '1px solid #e2e8f0', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  {a.score}/{a.max}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {result.priorities.length > 0 && (
+          <>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, margin: '20px 0 6px' }}>
+              {ui('reportNextTitle', 'What to work on first')}
+            </h2>
+            <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', lineHeight: 1.7 }}>
+              {result.priorities.map((p) => (
+                <li key={p.area.id} style={{ marginBottom: '8px' }}>
+                  <strong>{text(p.area.names, p.area.id)}</strong>
+                  {' — '}
+                  {p.bandLabel}
+                  {p.articles.length > 0 && (
+                    <div style={{ color: '#334155' }}>
+                      {ui('reportGuides', 'Guides in the Hub:')}{' '}
+                      {p.articles.map((art) => text(art.titles, 'Untitled')).join('; ')}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+
+        <p style={{ fontSize: '10px', color: '#64748b', marginTop: '22px', borderTop: '1px solid #cbd5e1', paddingTop: '8px', lineHeight: 1.6 }}>
+              {ui(
+                'reportFooter',
+                'Self-reported answers, not an audit. Read the guides for each area at the NGO Knowledge Hub.'
+              )}
+            </p>
+          </div>
+        </>,
+        document.body
+      )}
     </section>
   );
 };
