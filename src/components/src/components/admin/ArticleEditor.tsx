@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   FileText, 
   Plus, 
@@ -11,10 +11,11 @@ import {
   Eye, 
   Globe, 
   Search,
-  ArrowLeft
+  ArrowLeft,
+  AlertTriangle
 } from 'lucide-react';
 import { Article, Category, Language, SUPPORTED_LANGUAGES } from '../../types';
-import { saveArticles } from '../../lib/storage';
+import { saveArticles, ArticleSaveError } from '../../lib/storage';
 
 interface ArticleEditorProps {
   articles: Article[];
@@ -39,10 +40,63 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationMessage, setTranslationMessage] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  /**
+   * JSON of the article as it was last written to storage, so the editor can
+   * tell an unsaved change from a saved one and warn before discarding it.
+   */
+  const lastSavedRef = useRef<string | null>(null);
+  const isDirty = Boolean(activeArticle) && JSON.stringify(activeArticle) !== lastSavedRef.current;
+
+  // Warn on a browser tab close or reload while there are unsaved edits.
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty]);
+
+  /**
+   * Writes one article and reports whether it actually landed.
+   *
+   * Both the Save button and Auto-Translate go through here. Auto-Translate
+   * used to only call setActiveArticle and print "Successfully translated" —
+   * the text sat in React state and was thrown away the moment the editor was
+   * closed, while the message said otherwise.
+   */
+  const persist = (article: Article): boolean => {
+    const exists = articles.some(a => a.id === article.id);
+    const updated = exists
+      ? articles.map(a => (a.id === article.id ? article : a))
+      : [article, ...articles];
+
+    try {
+      saveArticles(updated);
+    } catch (err) {
+      setSaveError(
+        err instanceof ArticleSaveError
+          ? err.message
+          : 'Could not save: ' + String((err as Error)?.message || err)
+      );
+      return false;
+    }
+
+    lastSavedRef.current = JSON.stringify(article);
+    setSaveError(null);
+    onArticlesUpdated(updated);
+    return true;
+  };
 
   // Open editor for a specific article
   const handleStartEdit = (article: Article) => {
-    setActiveArticle(JSON.parse(JSON.stringify(article)));
+    const copy = JSON.parse(JSON.stringify(article));
+    lastSavedRef.current = JSON.stringify(copy);
+    setSaveError(null);
+    setActiveArticle(copy);
     setActiveLangTab('en');
     setIsPreviewMode(false);
   };
@@ -66,6 +120,8 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
       titles: { en: '' },
       bodies: { en: '' },
     };
+    lastSavedRef.current = null;
+    setSaveError(null);
     setActiveArticle(newArt);
     setActiveLangTab('en');
     setIsPreviewMode(false);
@@ -74,9 +130,19 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this article?')) {
       const updated = articles.filter(a => a.id !== id);
-      saveArticles(updated);
+      try {
+        saveArticles(updated);
+      } catch (err) {
+        setSaveError(
+          err instanceof ArticleSaveError
+            ? err.message
+            : 'Could not delete: ' + String((err as Error)?.message || err)
+        );
+        return;
+      }
       onArticlesUpdated(updated);
       if (activeArticle?.id === id) {
+        lastSavedRef.current = null;
         setActiveArticle(null);
       }
     }
@@ -89,16 +155,10 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
       return;
     }
 
-    const exists = articles.some(a => a.id === activeArticle.id);
-    let updated: Article[];
-    if (exists) {
-      updated = articles.map(a => (a.id === activeArticle.id ? activeArticle : a));
-    } else {
-      updated = [activeArticle, ...articles];
-    }
-
-    saveArticles(updated);
-    onArticlesUpdated(updated);
+    // Only leave the editor once the article is genuinely stored. Closing on a
+    // failed write is what turned a storage problem into lost work.
+    if (!persist(activeArticle)) return;
+    lastSavedRef.current = null;
     setActiveArticle(null);
     onCloseEditor();
   };
@@ -131,15 +191,25 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
 
       const data = await response.json();
       if (data.translatedTitle && data.translatedBody) {
-        setActiveArticle(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            titles: { ...prev.titles, [activeLangTab]: data.translatedTitle },
-            bodies: { ...prev.bodies, [activeLangTab]: data.translatedBody },
-          };
-        });
-        setTranslationMessage(`Successfully translated into ${SUPPORTED_LANGUAGES.find(l => l.code === activeLangTab)?.name}!`);
+        const langName = SUPPORTED_LANGUAGES.find(l => l.code === activeLangTab)?.name;
+        const translated: Article = {
+          ...activeArticle,
+          titles: { ...activeArticle.titles, [activeLangTab]: data.translatedTitle },
+          bodies: { ...activeArticle.bodies, [activeLangTab]: data.translatedBody },
+        };
+        setActiveArticle(translated);
+
+        // Save straight away. A translation takes a Gemini call and real money,
+        // and the old code kept it in React state only — so translating several
+        // languages and then leaving the editor silently discarded all of them
+        // while the message below claimed success.
+        if (persist(translated)) {
+          setTranslationMessage(`Translated into ${langName} and saved.`);
+        } else {
+          setTranslationMessage(
+            `Translated into ${langName}, but it could NOT be saved — see the error above. Do not close this editor.`
+          );
+        }
       } else {
         alert(data.error || 'Translation failed.');
       }
@@ -170,7 +240,20 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setActiveArticle(null)}
+                aria-label="Back to the article list"
+                onClick={() => {
+                  // This arrow used to discard the whole draft with no warning,
+                  // which is how a set of finished translations could vanish.
+                  if (
+                    isDirty &&
+                    !confirm('You have changes that are not saved yet. Leave the editor and lose them?')
+                  ) {
+                    return;
+                  }
+                  lastSavedRef.current = null;
+                  setSaveError(null);
+                  setActiveArticle(null);
+                }}
                 className="p-1.5 text-stone-500 hover:text-stone-900 rounded-lg hover:bg-stone-100 cursor-pointer"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -198,12 +281,40 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               <button
                 type="button"
                 onClick={handleSave}
-                className="flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-medium px-5 py-2 rounded-xl text-xs shadow-md transition-colors cursor-pointer"
+                className={`flex items-center gap-1.5 font-medium px-5 py-2 rounded-xl text-xs shadow-md transition-colors cursor-pointer text-white ${
+                  isDirty ? 'bg-emerald-800 hover:bg-emerald-900' : 'bg-stone-400 hover:bg-stone-500'
+                }`}
               >
                 <Save className="w-4 h-4" />
-                <span>Save Article</span>
+                <span>{isDirty ? 'Save Article *' : 'Saved'}</span>
               </button>
             </div>
+          </div>
+
+          {saveError && (
+            <div
+              role="alert"
+              className="flex items-start gap-3 bg-rose-50 border border-rose-300 text-rose-900 rounded-2xl p-4"
+            >
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-bold mb-0.5">This article was NOT saved</p>
+                <p className="text-rose-800">{saveError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Always shown, because it is always true. Article text lives in this
+              browser until it is exported, so a private window loses the lot on
+              close — which is exactly how a set of translations was lost. */}
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs leading-6">
+              <strong>Your edits are saved in this browser only.</strong> They are not on a
+              server and other people will not see them. A private or incognito window throws
+              them away when you close it. To publish your work, use{' '}
+              <strong>Export content.json</strong> in Settings and upload that file to GitHub.
+            </p>
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
