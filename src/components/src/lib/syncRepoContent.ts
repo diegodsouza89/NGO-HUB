@@ -229,33 +229,105 @@ function syncOne(
   return Object.assign({ skipped: false }, outcome);
 }
 
+/**
+ * Merge one source of content into this browser. Shared by the bundled
+ * content.json path and the published-from-D1 path so there is exactly one
+ * merge implementation — the one that was fixed after it destroyed a week of
+ * translations, and that has a test proving local text survives.
+ */
+function mergeFrom(
+  categoriesIn: Record<string, unknown>[],
+  articlesIn: Record<string, unknown>[],
+  source: string
+): boolean {
+  const categories = syncOne(
+    DATA_KEYS.categories,
+    STAMP_KEYS.categories,
+    BACKUP_KEYS.categories,
+    categoriesIn
+  );
+  const articles = syncOne(DATA_KEYS.articles, STAMP_KEYS.articles, BACKUP_KEYS.articles, articlesIn);
+
+  if (categories.skipped && articles.skipped) return false;
+
+  const kept = articles.keptTranslations + categories.keptTranslations;
+  const extra = articles.keptLocalOnly + categories.keptLocalOnly;
+  console.info(
+    `[NGO Hub] Content merged from ${source} — ` +
+      `${categoriesIn.length} categories, ${articlesIn.length} articles` +
+      (kept ? `, kept ${kept} local translation${kept === 1 ? '' : 's'}` : '') +
+      (extra ? `, kept ${extra} item${extra === 1 ? '' : 's'} not in the source` : '') +
+      '.'
+  );
+  return categories.changed || articles.changed;
+}
+
+/**
+ * Pull whatever the admin portal last published, and merge it in.
+ *
+ * Falls back silently to the content.json shipped in the build whenever the
+ * endpoint is missing, erroring, or has nothing published yet. Publishing is
+ * an upgrade to how content reaches visitors, never something the site
+ * depends on to render.
+ *
+ * @returns true when the local copy actually changed, so the caller can
+ *          re-read it into React state.
+ */
+export async function syncPublishedContent(): Promise<boolean> {
+  try {
+    if (typeof localStorage === 'undefined' || typeof fetch !== 'function') return false;
+
+    // A request with no time limit can hang the page: a server that accepts
+    // the connection and never answers leaves the site waiting indefinitely.
+    // Seen in testing against a server with no route for this path.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    let res: Response;
+    try {
+      res = await fetch('/api/content', {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    // Always read the body, even when the response is going to be ignored.
+    // Returning early without consuming it leaves the connection open: the
+    // page kept a pending request forever and never reached network idle.
+    const text = await res.text();
+    if (!res.ok) return false;
+
+    // An unrouted path on a single-page site answers with the app's own HTML
+    // and a 200, so parse defensively rather than trusting the status.
+    let data: { published?: boolean; categories?: unknown; articles?: unknown };
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return false;
+    }
+    if (!data || data.published !== true) return false;
+
+    const categories = Array.isArray(data.categories) ? data.categories : [];
+    const articles = Array.isArray(data.articles) ? data.articles : [];
+    // An empty publish would blank the site. The endpoint refuses to store
+    // one; this refuses to apply one, so a bug at either end cannot do it.
+    if (!categories.length && !articles.length) return false;
+
+    return mergeFrom(categories, articles, 'the admin portal');
+  } catch (error) {
+    console.warn('[NGO Hub] Could not load published content, using the bundled copy:', error);
+    return false;
+  }
+}
+
 export function syncRepoContent(): void {
   try {
     if (typeof localStorage === 'undefined') return;
 
-    const categories = syncOne(
-      DATA_KEYS.categories,
-      STAMP_KEYS.categories,
-      BACKUP_KEYS.categories,
-      INITIAL_CATEGORIES as unknown as Record<string, unknown>[]
-    );
-    const articles = syncOne(
-      DATA_KEYS.articles,
-      STAMP_KEYS.articles,
-      BACKUP_KEYS.articles,
-      INITIAL_ARTICLES as unknown as Record<string, unknown>[]
-    );
-
-    if (categories.skipped && articles.skipped) return;
-
-    const kept = articles.keptTranslations + categories.keptTranslations;
-    const extra = articles.keptLocalOnly + categories.keptLocalOnly;
-    console.info(
-      `[NGO Hub] Content merged from content.json — ` +
-        `${INITIAL_CATEGORIES.length} categories, ${INITIAL_ARTICLES.length} articles` +
-        (kept ? `, kept ${kept} local translation${kept === 1 ? '' : 's'}` : '') +
-        (extra ? `, kept ${extra} item${extra === 1 ? '' : 's'} not in the repo` : '') +
-        '.'
+    mergeFrom(
+      INITIAL_CATEGORIES as unknown as Record<string, unknown>[],
+      INITIAL_ARTICLES as unknown as Record<string, unknown>[],
+      'content.json'
     );
   } catch (error) {
     // Never block the app from rendering because of a storage problem
