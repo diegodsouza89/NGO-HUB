@@ -82,7 +82,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* ----------------------------------------------- markdown-safe line handling */
 
 // Leading markdown that must not be translated: headings, bullets, numbers, quotes.
-const PREFIX_RE = /^(\s*(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s*)?)([\s\S]*)$/;
+/**
+ * Everything at the start of a line that is structure rather than prose.
+ *
+ * The list only covered markdown (- * + 1. # >), but these articles were
+ * pasted out of a word processor and use "•" with a tab, "☐" for checklist
+ * boxes and "📌" for callouts. Those were being handed to the translator as
+ * if they were words, so a translated article could come back without the
+ * markers the reading view uses to find bullets, checklists and callouts —
+ * which is why translated guides fell back to plain prose.
+ */
+const PREFIX_RE =
+  /^(\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)][ \t]*|>\s*|[•·▪●][ \t]*|📌[ \t]*)?(?:[☐☑☒✅][ \t]*)?)([\s\S]*)$/;
 
 // Lines with no letters (rules, separators, blank) are left exactly as they are.
 function isUntranslatable(line) {
@@ -90,46 +101,63 @@ function isUntranslatable(line) {
 }
 
 /**
- * Replace things that must survive verbatim with simple alphanumeric markers.
- * Markers avoid punctuation because NMT models tend to reorder or drop it.
+ * Split a line into runs that must survive verbatim and runs to translate.
+ *
+ * The previous approach swapped protected spans for markers like "zq3zq",
+ * translated the whole line, then swapped them back. IndicTrans2 transliterates
+ * those markers into the target script — "zq1zq" comes back as
+ * "झेडक्यूझेडक्यू", "జెడ్ క్యూ 1 జెడ్ క్యూ", "ઝેડ. ક્યુ. ઝેડ. ક્યુ." — and
+ * sometimes drops the digit entirely, so the restore step could neither find
+ * the marker nor tell which span it had stood for. The marker text was left on
+ * the page and the URL or brand name it was guarding was gone. Seven of the
+ * first twenty-two published translations were damaged this way.
+ *
+ * Nothing that must survive is sent to the model any more. Each protected run
+ * is held back and concatenated into place afterwards.
  */
-function protectSpans(text) {
-  const kept = [];
-  const stash = (m) => {
-    kept.push(m);
-    return ' zq' + (kept.length - 1) + 'zq ';
-  };
+const PROTECT_RE = new RegExp(
+  [
+    '`[^`]*`',
+    '!?\\[[^\\]]*\\]\\([^)]*\\)',
+    'https?://[^\\s)]+',
+    '\\b[\\w.+-]+@[\\w-]+\\.[\\w.]+\\b',
+    '\\*\\*|__',
+    PROTECTED.map((t) => '\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').join('|'),
+  ].join('|'),
+  'g'
+);
 
-  let out = text
-  .replace(/`[^`]*`/g, stash)
-  .replace(/!?\[[^\]]*\]\([^)]*\)/g, stash)
-  .replace(/https?:\/\/[^\s)]+/g, stash)
-  .replace(/\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, stash)
-  .replace(/\*\*|__/g, stash);
-
-  for (const term of PROTECTED) {
-    const re = new RegExp('\\b' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g');
-    out = out.replace(re, stash);
+/** @returns {{keep?: string, text?: string}[]} in original order. */
+function segmentLine(line) {
+  const parts = [];
+  let last = 0;
+  let m;
+  PROTECT_RE.lastIndex = 0;
+  while ((m = PROTECT_RE.exec(line)) !== null) {
+    if (m.index > last) parts.push({ text: line.slice(last, m.index) });
+    parts.push({ keep: m[0] });
+    last = m.index + m[0].length;
+    if (m[0] === '') PROTECT_RE.lastIndex++;   // never loop on an empty match
   }
-  return { masked: out, kept };
+  if (last < line.length) parts.push({ text: line.slice(last) });
+  return parts;
 }
 
 /**
- * Put the protected spans back. IndicTrans2 drops the padding spaces we added,
-  * so spacing is re-inserted rather than trusted - without this you get
-   * "Google Workspacemein" and "liyehttps://...". tidySpacing then pulls bold
-    * delimiters back onto their text.
-     */
-function restoreSpans(text, kept) {
-  let out = String(text == null ? '' : text);
-  // Descending so zq1zq is never confused with zq10zq, and a function
-  // replacement so a "$" inside the kept text is not read as a replacement
-  // pattern - their content contains amounts like "$10,000/month".
-  for (let i = kept.length - 1; i >= 0; i--) {
-    const re = new RegExp('\\s*z\\s*q\\s*' + i + '\\s*z\\s*q\\s*', 'gi');
-    out = out.replace(re, () => ' ' + kept[i] + ' ');
+ * Translated segments come back without the spacing that sat around them, so
+ * the original leading and trailing whitespace is put back rather than trusted.
+ * Without this you get "Google Workspacemein" where a brand name met a word.
+ */
+function rejoin(parts, translated) {
+  let out = '';
+  for (const part of parts) {
+    if ('keep' in part) { out += part.keep; continue; }
+    if (part.job === undefined) { out += part.text; continue; }
+    const lead = (part.text.match(/^\s*/) || [''])[0];
+    const trail = (part.text.match(/\s*$/) || [''])[0];
+    out += lead + String(translated[part.job] == null ? '' : translated[part.job]).trim() + trail;
   }
-  return tidySpacing(out);
+  return out;
 }
 
 function tidySpacing(text) {
@@ -203,25 +231,32 @@ async function translateWithIndic(ai, title, body, flores) {
       plan.push({ keep: line });
       continue;
     }
-    const masked = protectSpans(content);
-    plan.push({ prefix: prefix, kept: masked.kept, job: jobs.length });
-    jobs.push(masked.masked);
+    const parts = segmentLine(content);
+    for (const part of parts) {
+      if ('keep' in part) continue;
+      if (!part.text.trim()) continue;          // whitespace only, nothing to translate
+      part.job = jobs.length;
+      jobs.push(part.text.trim());
+    }
+    plan.push({ prefix: prefix, parts: parts });
   }
 
-  const titleMask = protectSpans(String(title));
-  const titleJob = jobs.length;
-  jobs.push(titleMask.masked);
+  const titleParts = segmentLine(String(title));
+  for (const part of titleParts) {
+    if ('keep' in part) continue;
+    if (!part.text.trim()) continue;
+    part.job = jobs.length;
+    jobs.push(part.text.trim());
+  }
 
   const translated = await runIndic(ai, jobs, flores);
 
   const outLines = plan.map((step) =>
-    'keep' in step
-    ? step.keep
-    : step.prefix + restoreSpans(translated[step.job], step.kept).trim()
-    );
+    'keep' in step ? step.keep : step.prefix + tidySpacing(rejoin(step.parts, translated))
+  );
 
   return {
-    translatedTitle: restoreSpans(translated[titleJob], titleMask.kept).trim(),
+    translatedTitle: tidySpacing(rejoin(titleParts, translated)),
     translatedBody: outLines.join('\n'),
   };
 }
