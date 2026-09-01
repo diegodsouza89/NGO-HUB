@@ -122,10 +122,22 @@ const PROTECT_RE = new RegExp(
     'https?://[^\\s)]+',
     '\\b[\\w.+-]+@[\\w-]+\\.[\\w.]+\\b',
     '\\*\\*|__',
-    PROTECTED.map((t) => '\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').join('|'),
   ].join('|'),
   'g'
 );
+
+/*
+ * Brand names are deliberately NOT in that list any more.
+ *
+ * Holding a word back means the fragments either side of it are translated
+ * independently, and Indic languages put the verb last. Protecting "Zoom" in
+ * "What Is Zoom's Nonprofit Discount?" produced "काय आहे? Zoomना-नफा सवलत?" —
+ * no marker corruption, but broken word order and the brand glued to the next
+ * word. Only spans that are meaningless to a translator and must survive byte
+ * for byte — markdown links, URLs, emails, code and the bold delimiters — are
+ * held back now. A transliterated brand name reads better than a mangled
+ * sentence.
+ */
 
 /** @returns {{keep?: string, text?: string}[]} in original order. */
 function segmentLine(line) {
@@ -278,6 +290,11 @@ function buildPrompt(title, body, languageName) {
     '4. Use clear, simple ' + languageName + ' that non-technical NGO staff can follow.',
     '5. Keep all numbers, currency amounts, percentages and dates unchanged.',
     '6. Translate the title concisely - no commentary, no quotation marks.',
+    '7. Keep the exact characters each line STARTS with. These articles use a',
+    '   bullet followed by a tab, a checkbox for checklist items and a pin for',
+    '   callouts. Copy those through unchanged rather than converting them to',
+    '   Markdown dashes - the reading view uses them to find lists, checklists',
+    '   and callouts, and a converted bullet loses that structure.',
     '',
     'Return ONLY JSON matching the schema. No markdown fences, no explanation.',
     '',
