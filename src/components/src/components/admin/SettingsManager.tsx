@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Settings, Save, ShieldCheck, RefreshCcw, Check, BarChart2, AlertTriangle, Download, UploadCloud } from 'lucide-react';
 import { Article, Category, SiteSettings, SUPPORTED_LANGUAGES } from '../../types';
 import { buildContentJson, downloadContentJson, summariseContent } from '../../lib/exportContent';
+import {
+  publishContent,
+  fetchPublishedState,
+  getPublishKey,
+  setPublishKey,
+  PublishedState,
+} from '../../lib/publishContent';
 import { saveSettings, resetToDefaults } from '../../lib/storage';
 import { canHash, hashPassword, isDefaultPassword } from '../../lib/adminAuth';
 
@@ -25,6 +32,40 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [exportState, setExportState] = useState<'idle' | 'done' | 'blocked'>('idle');
+  const [publishKey, setKeyInput] = useState(getPublishKey());
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [live, setLive] = useState<PublishedState | null>(null);
+
+  // What is live right now, so the panel can say so before anything is pressed.
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublishedState().then((state) => {
+      if (!cancelled) setLive(state);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    setPublishMsg(null);
+    const result = await publishContent(categories, articles, publishKey);
+    setPublishing(false);
+    setPublishMsg({ ok: result.ok, text: result.message });
+    if (result.ok) {
+      setPublishKey(publishKey);   // only remember a key that actually worked
+      setLive({
+        available: true,
+        published: true,
+        publishedAt: result.publishedAt,
+        categories: result.categories,
+        articles: result.articles,
+      });
+    }
+  };
+
   const [usingDefaultPassword, setUsingDefaultPassword] = useState(false);
 
   // Warn while the shipped password is still in force. Checked here rather than
@@ -361,6 +402,84 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
               })}
             </div>
           </div>
+        </div>
+
+        {/* Publish straight to the live site. The download below stays as a
+            backup route and as a way to keep a copy in the repository. */}
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <UploadCloud className="w-4 h-4 text-emerald-800" />
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">
+              Publish to everyone
+            </span>
+          </div>
+
+          <p className="text-[11px] leading-6 text-emerald-900/80 mb-3">
+            {live === null
+              ? 'Checking what is live…'
+              : !live.available
+                ? 'Direct publishing is not set up on the server yet. Use Download content.json below.'
+                : live.published
+                  ? 'Live now: ' +
+                    (live.articles ?? '?') +
+                    ' articles, ' +
+                    (live.categories ?? '?') +
+                    ' categories' +
+                    (live.publishedAt
+                      ? ', published ' + new Date(live.publishedAt).toLocaleString()
+                      : '') +
+                    '.'
+                  : 'Nothing has been published yet — visitors are seeing content.json from the build.'}
+          </p>
+
+          <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+            <label className="flex-1 min-w-0">
+              <span className="block text-[11px] font-semibold text-emerald-900 mb-1">
+                Publish key
+              </span>
+              <input
+                type="password"
+                value={publishKey}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder="Set as CONTENT_ADMIN_KEY on Cloudflare"
+                autoComplete="off"
+                className="w-full px-3 py-2 text-sm bg-white border border-emerald-300 rounded-xl focus:outline-hidden focus:border-emerald-600"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={publishing || !live?.available}
+              className={
+                'inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold shrink-0 transition-colors ' +
+                (publishing || !live?.available
+                  ? 'bg-stone-300 text-stone-600 cursor-not-allowed'
+                  : 'bg-emerald-800 hover:bg-emerald-900 text-white cursor-pointer')
+              }
+            >
+              <UploadCloud className="w-4 h-4" />
+              {publishing ? 'Publishing…' : 'Publish now'}
+            </button>
+          </div>
+
+          {publishMsg && (
+            <div
+              role="alert"
+              className={
+                'mt-3 rounded-xl border p-3 text-[11px] leading-5 ' +
+                (publishMsg.ok
+                  ? 'border-emerald-300 bg-white text-emerald-900'
+                  : 'border-rose-300 bg-rose-50 text-rose-900')
+              }
+            >
+              <strong className="font-bold">{publishMsg.ok ? 'Done. ' : 'Not published. '}</strong>
+              {publishMsg.text}
+            </div>
+          )}
+
+          <p className="text-[10px] text-emerald-900/60 mt-2 leading-5">
+            The key is stored in this browser only, never in the repository.
+          </p>
         </div>
 
         <button
