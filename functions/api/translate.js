@@ -46,7 +46,20 @@ const GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Keep Gemini requests small enough to fit inside free-tier per-minute limits.
 const CHUNK_TARGET = 2200;
-const TIME_BUDGET_MS = 24000;
+/**
+ * Wall-clock budget for the whole request, shared across engines.
+ *
+ * This was 24s, which quietly decided the engine for you. Gemini is tried
+ * first and a full article with structured JSON output takes longer than that,
+ * so it hit the deadline on every long guide and fell back to IndicTrans2 —
+ * the engine whose masking corrupted seven published translations. Short
+ * articles finished in time and came back clean, which is exactly the mix that
+ * was live.
+ *
+ * Waiting on an external fetch costs no CPU time on Workers, so a generous
+ * wall-clock budget is cheap. The browser is the thing that has to be patient.
+ */
+const TIME_BUDGET_MS = 75000;
 
 // Names that should stay in Latin script rather than being transliterated.
 const PROTECTED = [
@@ -456,7 +469,7 @@ export async function onRequest(context) {
 
   const lang = LANGS[code];
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIME_BUDGET_MS + 4000);
+  const timer = setTimeout(() => controller.abort(), TIME_BUDGET_MS + 10000);
   const deadline = Date.now() + TIME_BUDGET_MS;
   const problems = [];
 
@@ -480,7 +493,12 @@ export async function onRequest(context) {
   try {
     for (const pair of order) {
       try {
-        return json(await pair[1]());
+        const result = await pair[1]();
+        // Report what was tried. A silent fallback is how a timeout got to
+        // decide which engine translated the articles, with nothing in the
+        // response to show it had happened.
+        if (problems.length) result.attempted = problems.slice();
+        return json(result);
       } catch (err) {
         const msg = err && err.message === 'DEADLINE'
           ? 'took too long - the article is very long'
