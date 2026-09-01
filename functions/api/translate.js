@@ -322,7 +322,16 @@ function buildPrompt(title, body, languageName) {
 async function runGemini(apiKey, model, title, body, languageName, signal) {
   const generationConfig = {
     temperature: 0.2,
-    maxOutputTokens: Math.min(32768, Math.max(2048, Math.ceil(body.length / 4) * 6 + 1024)),
+    // Indic scripts are expensive to tokenise. The old allowance —
+    // (chars / 4) * 6 + 1024 — gave a 3,227 character article 5,866 tokens,
+    // which Tamil squeaked through and Hindi and Bengali did not: Gemini
+    // returned finishReason MAX_TOKENS, the code threw "too long to translate",
+    // and it fell back to IndicTrans2 without saying so. That single number is
+    // what decided which engine translated each of your articles.
+    //
+    // A cap is not a reservation and unused headroom costs nothing, so this is
+    // now generous rather than tight.
+    maxOutputTokens: Math.min(32768, Math.max(8192, Math.ceil(body.length / 4) * 16 + 4096)),
     responseMimeType: 'application/json',
     responseSchema: {
       type: 'OBJECT',
