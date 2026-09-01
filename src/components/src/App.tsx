@@ -22,6 +22,7 @@ import {
   isAdminAuthenticated,
   getCurrentUser
 } from './lib/storage';
+import { syncPublishedContent } from './lib/syncRepoContent';
 
 export default function App() {
   const isAdminRoute = (path: string) => path === '/admin' || path === '/staff';
@@ -60,6 +61,18 @@ export default function App() {
 
   useEffect(() => {
     refreshData();
+
+    // Whatever the admin portal last published wins over the content.json in
+    // this build. Deliberately after the first render: the bundled copy paints
+    // immediately, and the published copy replaces it a moment later, so a
+    // slow or missing endpoint never delays the page.
+    syncPublishedContent()
+      .then((changed) => {
+        if (changed) refreshData();
+      })
+      .catch(() => {
+        /* already handled and logged inside syncPublishedContent */
+      });
   }, []);
 
   // Route listener for separate admin portal page
