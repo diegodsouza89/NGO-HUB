@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Lock, ArrowRight, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { setAdminAuthenticated } from '../../lib/storage';
+import { checkAccessIdentity } from '../../lib/accessIdentity';
 import {
   canHash,
   clearFailures,
@@ -35,6 +36,35 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   const [isChecking, setIsChecking] = useState(false);
   const [lockMs, setLockMs] = useState(() => lockedForMs());
   const timer = useRef<number | null>(null);
+
+  /**
+   * Cloudflare Access, if it is in front of this page, has already established
+   * who this is — the same identity in every browser and in incognito, which
+   * is exactly what the stored password cannot do. Asking for a password on
+   * top of that adds nothing, so this goes straight in.
+   *
+   * 'checking' is the starting state so the password box does not flash up and
+   * then vanish. When Access is not configured the check fails fast and the
+   * form appears as it always has.
+   */
+  const [accessState, setAccessState] = useState<'checking' | 'none'>('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+    checkAccessIdentity().then((identity) => {
+      if (cancelled) return;
+      if (identity.ok) {
+        clearFailures();
+        setAdminAuthenticated(true);
+        onSuccess();
+        return;
+      }
+      setAccessState('none');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [onSuccess]);
 
   // Keep the countdown honest while the form is locked.
   useEffect(() => {
@@ -97,6 +127,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       setIsChecking(false);
     }
   };
+
+  if (accessState === 'checking') {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+        <div className="flex items-center gap-3 text-sm font-semibold text-slate-500">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span>Checking your sign-in…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">

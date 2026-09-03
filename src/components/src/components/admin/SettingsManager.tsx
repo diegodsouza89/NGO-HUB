@@ -36,6 +36,24 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [live, setLive] = useState<PublishedState | null>(null);
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
+
+  /**
+   * What this publish would REMOVE from the live site.
+   *
+   * A publish replaces the live set outright, and visitors now delete anything
+   * it omits — that is what makes deleting a category in here actually reach
+   * people. The flip side is that publishing from a browser with an incomplete
+   * copy would wipe real content, so anything about to disappear is named and
+   * needs a second press.
+   */
+  const outgoingCategoryIds = new Set(categories.map((c) => String(c.id)));
+  const outgoingArticleIds = new Set(articles.map((a) => String(a.id)));
+  const removingCategories = (live?.liveCategories || []).filter(
+    (c) => !outgoingCategoryIds.has(c.id)
+  );
+  const removingArticles = (live?.liveArticles || []).filter((a) => !outgoingArticleIds.has(a.id));
+  const removalCount = removingCategories.length + removingArticles.length;
 
   // What is live right now, so the panel can say so before anything is pressed.
   useEffect(() => {
@@ -49,6 +67,13 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   }, []);
 
   const handlePublish = async () => {
+    // Anything that would vanish gets named first and needs a second press.
+    if (publishKey.trim() && removalCount > 0 && !confirmRemoval) {
+      setConfirmRemoval(true);
+      setPublishMsg(null);
+      return;
+    }
+
     setPublishing(true);
     setPublishMsg(null);
     const result = await publishContent(categories, articles, publishKey);
@@ -56,12 +81,22 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
     setPublishMsg({ ok: result.ok, text: result.message });
     if (result.ok) {
       setPublishKey(publishKey);   // only remember a key that actually worked
+      setConfirmRemoval(false);
       setLive({
         available: true,
         published: true,
         publishedAt: result.publishedAt,
         categories: result.categories,
         articles: result.articles,
+        // The set just sent is now the live set, so nothing is pending removal.
+        liveCategories: categories.map((c) => ({
+          id: String(c.id),
+          name: String((c.names || {}).en || c.id),
+        })),
+        liveArticles: articles.map((a) => ({
+          id: String(a.id),
+          name: String((a.titles || {}).en || a.id),
+        })),
       });
     }
   };
@@ -458,9 +493,60 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
               }
             >
               <UploadCloud className="w-4 h-4" />
-              {publishing ? 'Publishing…' : 'Publish now'}
+              {publishing
+                ? 'Publishing…'
+                : confirmRemoval
+                  ? 'Yes, publish and remove'
+                  : 'Publish now'}
             </button>
           </div>
+
+          {/* Named, not counted. "3 items will be removed" is not something an
+              admin can check; a list of titles is. */}
+          {confirmRemoval && removalCount > 0 && (
+            <div
+              role="alert"
+              className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-bold mb-1">
+                    Publishing this will delete {removalCount}{' '}
+                    {removalCount === 1 ? 'item' : 'items'} from the live site.
+                  </p>
+                  {removingCategories.length > 0 && (
+                    <p className="mb-1">
+                      <span className="font-semibold">
+                        {removingCategories.length === 1 ? 'Category' : 'Categories'}:
+                      </span>{' '}
+                      {removingCategories.map((c) => c.name).join(', ')}
+                    </p>
+                  )}
+                  {removingArticles.length > 0 && (
+                    <p className="mb-1">
+                      <span className="font-semibold">
+                        {removingArticles.length === 1 ? 'Guide' : 'Guides'}:
+                      </span>{' '}
+                      {removingArticles.map((a) => a.name).join(', ')}
+                    </p>
+                  )}
+                  <p className="mt-2">
+                    That is what you want if you deleted {removalCount === 1 ? 'it' : 'them'} on
+                    purpose. If anything above should still be on the site, press Cancel — you are
+                    probably in a browser that does not have the full copy.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoval(false)}
+                    className="mt-2 underline font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {publishMsg && (
             <div
