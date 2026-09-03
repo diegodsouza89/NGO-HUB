@@ -44,12 +44,35 @@ export interface PublishResult {
   articles?: number;
 }
 
+/** Enough of a live item to name it in a warning, without holding all 400 KB. */
+export interface LiveItem {
+  id: string;
+  name: string;
+}
+
 export interface PublishedState {
   available: boolean;
   published: boolean;
   publishedAt?: string;
   categories?: number;
   articles?: number;
+  /**
+   * What is live, by id. The panel needs these to say which items a publish
+   * would REMOVE: since a publish is a complete snapshot, anything live that
+   * the outgoing set omits is deleted for every visitor.
+   */
+  liveCategories?: LiveItem[];
+  liveArticles?: LiveItem[];
+}
+
+function liveItems(list: unknown, field: 'names' | 'titles'): LiveItem[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((x) => x && typeof x === 'object' && typeof x.id === 'string')
+    .map((x) => ({
+      id: x.id as string,
+      name: String((x[field] || {}).en || x.id).trim() || (x.id as string),
+    }));
 }
 
 /** What is live right now, for the panel to show before anyone presses anything. */
@@ -64,6 +87,8 @@ export async function fetchPublishedState(): Promise<PublishedState> {
       publishedAt: data && data.publishedAt,
       categories: data && Array.isArray(data.categories) ? data.categories.length : undefined,
       articles: data && Array.isArray(data.articles) ? data.articles.length : undefined,
+      liveCategories: liveItems(data && data.categories, 'names'),
+      liveArticles: liveItems(data && data.articles, 'titles'),
     };
   } catch {
     return { available: false, published: false };

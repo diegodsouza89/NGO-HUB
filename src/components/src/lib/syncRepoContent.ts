@@ -35,10 +35,29 @@ import { INITIAL_ARTICLES, INITIAL_CATEGORIES } from '../data/initialData';
  * before anything is written, so even a merge that behaves unexpectedly is
  * recoverable from the browser console.
  *
- * Deliberate trade-off: an article deleted from content.json is NOT deleted
- * here, because this code cannot tell "removed from the repo" from "created in
- * the portal". Silently deleting someone's content is the mistake above; leaving
- * an extra row for an admin to remove is not.
+ * Deleting things: who is allowed to
+ * ----------------------------------
+ * content.json is NEVER allowed to delete. This code cannot tell "removed from
+ * the repo" from "created in the portal", and silently deleting someone's
+ * content is the mistake above.
+ *
+ * A PUBLISH is allowed to delete, because it is different in kind: it is a
+ * complete snapshot of an admin's portal, sent deliberately by a person who
+ * pressed a button. There, an item's absence really does mean "I removed this".
+ *
+ * On 2 September 2026 four categories were deleted in the portal and published,
+ * and every browser went on showing all twelve. Two reasons, both fixed here:
+ *
+ *   1. Both sources wrote to ONE pair of stamp keys, so each invalidated the
+ *      other's stamp. content.json was therefore re-merged on every single
+ *      load, for ever, re-adding the four deleted categories each time. The
+ *      stamps are now per source.
+ *
+ *   2. Nothing ever removed an item. A publish may now remove one, but only if
+ *      the id came from an authoritative source in the first place — it is in
+ *      the bundled content.json, or a previous publish contained it. An id that
+ *      appears in neither was created in this browser and has never been
+ *      published, so it is kept; that is a draft, not a deletion.
  */
 
 const DATA_KEYS = {
@@ -46,9 +65,33 @@ const DATA_KEYS = {
   articles: 'ngo_articles',
 } as const;
 
+/**
+ * One stamp per source per list. Sharing a stamp between content.json and the
+ * published set meant each source invalidated the other, so neither was ever
+ * skipped and content.json was re-applied on every load.
+ */
 const STAMP_KEYS = {
-  categories: 'ngo_content_stamp_categories',
-  articles: 'ngo_content_stamp_articles',
+  repo: {
+    categories: 'ngo_content_stamp_repo_categories',
+    articles: 'ngo_content_stamp_repo_articles',
+  },
+  published: {
+    categories: 'ngo_content_stamp_pub_categories',
+    articles: 'ngo_content_stamp_pub_articles',
+  },
+} as const;
+
+/** Set once a publish has been applied here; content.json then stands down. */
+const PUBLISH_SEEN_KEY = 'ngo_content_publish_seen';
+
+/**
+ * Every id this browser has ever received from a publish. An id in here has
+ * been published at least once, so its later absence from a publish is a
+ * deletion rather than a draft that has not gone out yet.
+ */
+const PUBLISHED_ID_KEYS = {
+  categories: 'ngo_content_published_ids_categories',
+  articles: 'ngo_content_published_ids_articles',
 } as const;
 
 const BACKUP_KEYS = {
@@ -83,6 +126,35 @@ function stampOf(value: unknown): string {
     hash = ((hash * 33) ^ serialised.charCodeAt(i)) >>> 0;
   }
   return `${serialised.length}-${hash.toString(36)}`;
+}
+
+function idsOf(list: Record<string, unknown>[]): string[] {
+  const out: string[] = [];
+  for (const item of list) {
+    if (item && typeof item.id === 'string' && item.id) out.push(item.id);
+  }
+  return out;
+}
+
+function readIdSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function addToIdSet(key: string, ids: string[]): void {
+  try {
+    const merged = readIdSet(key);
+    for (const id of ids) merged.add(id);
+    localStorage.setItem(key, JSON.stringify(Array.from(merged)));
+  } catch (e) {
+    /* losing this list only means a later deletion is treated as a draft */
+  }
 }
 
 function readList(key: string): Record<string, unknown>[] {
@@ -152,12 +224,19 @@ interface MergeOutcome {
   value: Record<string, unknown>[];
   keptLocalOnly: number;
   keptTranslations: number;
+  removedIds: string[];
 }
 
+/**
+ * @param removableIds ids this source is entitled to delete when it omits
+ *        them. Undefined means "this source may not delete anything", which is
+ *        how content.json is always called.
+ */
 function mergeList(
   repoList: Record<string, unknown>[],
   localList: Record<string, unknown>[],
-  keepCounters: boolean
+  keepCounters: boolean,
+  removableIds?: Set<string>
 ): MergeOutcome {
   const localById = new Map<string, Record<string, unknown>>();
   for (const item of localList) {
@@ -186,12 +265,24 @@ function mergeList(
     (item) => item && typeof item.id === 'string' && !repoIds.has(item.id)
   );
 
-  const value = merged.concat(localOnly);
+  // An item this source omits is only dropped when the source is entitled to
+  // delete it. Anything else stays, exactly as before — an unpublished draft
+  // must never disappear because someone else published.
+  const removedIds: string[] = [];
+  const kept: Record<string, unknown>[] = [];
+  for (const item of localOnly) {
+    const id = String(item.id);
+    if (removableIds && removableIds.has(id)) removedIds.push(id);
+    else kept.push(item);
+  }
+
+  const value = merged.concat(kept);
   return {
     changed: JSON.stringify(value) !== JSON.stringify(localList),
     value,
-    keptLocalOnly: localOnly.length,
+    keptLocalOnly: kept.length,
     keptTranslations,
+    removedIds,
   };
 }
 
@@ -199,7 +290,8 @@ function syncOne(
   dataKey: string,
   stampKey: string,
   backupKey: string,
-  repoValue: Record<string, unknown>[]
+  repoValue: Record<string, unknown>[],
+  removableIds?: Set<string>
 ): MergeOutcome & { skipped: boolean } {
   // The stamp is taken over the repo content exactly as it appears in
   // content.json. Nothing derived, so no change to this file can trigger a
@@ -209,10 +301,17 @@ function syncOne(
   const local = readList(dataKey);
 
   if (stored === current && local.length > 0) {
-    return { skipped: true, changed: false, value: local, keptLocalOnly: 0, keptTranslations: 0 };
+    return {
+      skipped: true,
+      changed: false,
+      value: local,
+      keptLocalOnly: 0,
+      keptTranslations: 0,
+      removedIds: [],
+    };
   }
 
-  const outcome = mergeList(repoValue, local, local.length > 0);
+  const outcome = mergeList(repoValue, local, local.length > 0, removableIds);
 
   // Keep one copy of what was here before, so an unexpected merge is
   // recoverable: JSON.parse(localStorage.getItem('ngo_articles_before_last_sync'))
@@ -238,25 +337,36 @@ function syncOne(
 function mergeFrom(
   categoriesIn: Record<string, unknown>[],
   articlesIn: Record<string, unknown>[],
-  source: string
+  source: string,
+  stamps: { categories: string; articles: string },
+  removable?: { categories: Set<string>; articles: Set<string> }
 ): boolean {
   const categories = syncOne(
     DATA_KEYS.categories,
-    STAMP_KEYS.categories,
+    stamps.categories,
     BACKUP_KEYS.categories,
-    categoriesIn
+    categoriesIn,
+    removable && removable.categories
   );
-  const articles = syncOne(DATA_KEYS.articles, STAMP_KEYS.articles, BACKUP_KEYS.articles, articlesIn);
+  const articles = syncOne(
+    DATA_KEYS.articles,
+    stamps.articles,
+    BACKUP_KEYS.articles,
+    articlesIn,
+    removable && removable.articles
+  );
 
   if (categories.skipped && articles.skipped) return false;
 
   const kept = articles.keptTranslations + categories.keptTranslations;
   const extra = articles.keptLocalOnly + categories.keptLocalOnly;
+  const gone = categories.removedIds.concat(articles.removedIds);
   console.info(
     `[NGO Hub] Content merged from ${source} — ` +
       `${categoriesIn.length} categories, ${articlesIn.length} articles` +
       (kept ? `, kept ${kept} local translation${kept === 1 ? '' : 's'}` : '') +
       (extra ? `, kept ${extra} item${extra === 1 ? '' : 's'} not in the source` : '') +
+      (gone.length ? `, removed ${gone.length} deleted in the portal (${gone.join(', ')})` : '') +
       '.'
   );
   return categories.changed || articles.changed;
@@ -313,7 +423,46 @@ export async function syncPublishedContent(): Promise<boolean> {
     // one; this refuses to apply one, so a bug at either end cannot do it.
     if (!categories.length && !articles.length) return false;
 
-    return mergeFrom(categories, articles, 'the admin portal');
+    // Which absences count as deletions. An id is fair game only if it came
+    // from an authoritative source: the bundled content.json, or a publish
+    // this browser has already seen. Anything else was created here and has
+    // never been published, so it is a draft and is kept.
+    //
+    // This is computed BEFORE the ids of this publish are recorded, otherwise
+    // every item would look previously-published and the distinction would
+    // collapse.
+    const removable = {
+      categories: new Set(
+        idsOf(INITIAL_CATEGORIES as unknown as Record<string, unknown>[]).concat(
+          Array.from(readIdSet(PUBLISHED_ID_KEYS.categories))
+        )
+      ),
+      articles: new Set(
+        idsOf(INITIAL_ARTICLES as unknown as Record<string, unknown>[]).concat(
+          Array.from(readIdSet(PUBLISHED_ID_KEYS.articles))
+        )
+      ),
+    };
+
+    const changed = mergeFrom(
+      categories as Record<string, unknown>[],
+      articles as Record<string, unknown>[],
+      'the admin portal',
+      STAMP_KEYS.published,
+      removable
+    );
+
+    addToIdSet(PUBLISHED_ID_KEYS.categories, idsOf(categories as Record<string, unknown>[]));
+    addToIdSet(PUBLISHED_ID_KEYS.articles, idsOf(articles as Record<string, unknown>[]));
+    try {
+      // From here on content.json stands down: what an admin published is
+      // newer than what happened to be in the build.
+      localStorage.setItem(PUBLISH_SEEN_KEY, '1');
+    } catch (e) {
+      /* worst case content.json keeps merging, which is the old behaviour */
+    }
+
+    return changed;
   } catch (error) {
     console.warn('[NGO Hub] Could not load published content, using the bundled copy:', error);
     return false;
@@ -324,10 +473,21 @@ export function syncRepoContent(): void {
   try {
     if (typeof localStorage === 'undefined') return;
 
+    // Once anything has been published, the published set is the source of
+    // truth and this must not run at all. It cannot delete, so re-merging a
+    // content.json that predates the publish quietly re-added four categories
+    // an admin had deleted — every load, because the publish then corrected
+    // only the items it still contained.
+    //
+    // A browser that has never seen a publish is unaffected: storage.ts still
+    // seeds from content.json, and this still keeps it up to date.
+    if (localStorage.getItem(PUBLISH_SEEN_KEY) === '1') return;
+
     mergeFrom(
       INITIAL_CATEGORIES as unknown as Record<string, unknown>[],
       INITIAL_ARTICLES as unknown as Record<string, unknown>[],
-      'content.json'
+      'content.json',
+      STAMP_KEYS.repo
     );
   } catch (error) {
     // Never block the app from rendering because of a storage problem
