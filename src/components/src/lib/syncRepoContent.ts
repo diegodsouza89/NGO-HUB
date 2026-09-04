@@ -123,6 +123,31 @@ const TEXT_MAPS = ['titles', 'bodies', 'names', 'descriptions'] as const;
 const REPO_PREFERS_LOCAL = ['icon'] as const;
 const PUBLISH_PREFERS_LOCAL: readonly string[] = [];
 
+/**
+ * Bumped whenever the MERGE ITSELF changes, not just the content.
+ *
+ * The stamp answers "have I already taken this content in?", and skipping on a
+ * match is what stops a merge running on every load. But it made a fix to the
+ * merge unreachable: browsers had already absorbed the current publish under
+ * the OLD rules, stamped it, and then skipped — so correcting how icons merge
+ * changed nothing for exactly the browsers that needed correcting. The icons
+ * were right on the server, right in a fresh browser, and stuck everywhere
+ * else. Only the next publish would have shaken them loose.
+ *
+ * Including this in the stamp invalidates every stored stamp once when the
+ * merge rules change, so each browser re-merges a single time under the new
+ * rules and then goes back to skipping.
+ *
+ * Raising it is safe because merging never replaces: repo and published text
+ * only fill gaps, local-only items survive, and the previous content is
+ * copied to the BACKUP_KEYS first. Raise it when you change mergeRecord,
+ * mergeTextMap, or which fields prefer the local value.
+ *
+ *   1 - original
+ *   2 - a publish now sets the icon; content.json still does not
+ */
+const MERGE_VERSION = 2;
+
 function stampOf(value: unknown): string {
   const serialised = JSON.stringify(value) ?? '';
   // djb2 — small, fast, and good enough to answer "did content.json change?"
@@ -130,7 +155,7 @@ function stampOf(value: unknown): string {
   for (let i = 0; i < serialised.length; i++) {
     hash = ((hash * 33) ^ serialised.charCodeAt(i)) >>> 0;
   }
-  return `${serialised.length}-${hash.toString(36)}`;
+  return `v${MERGE_VERSION}-${serialised.length}-${hash.toString(36)}`;
 }
 
 function idsOf(list: Record<string, unknown>[]): string[] {
