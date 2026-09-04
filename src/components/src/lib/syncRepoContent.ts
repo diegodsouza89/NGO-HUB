@@ -106,17 +106,22 @@ const COUNTER_FIELDS = ['views', 'downloadsCount', 'bookmarkCount', 'helpfulYes'
 const TEXT_MAPS = ['titles', 'bodies', 'names', 'descriptions'] as const;
 
 /**
- * Fields the admin portal invites someone to change, which are presentation
- * rather than content. A choice made in the portal is kept.
+ * Fields where a choice already made in THIS browser beats the incoming value.
  *
- * `icon` is here because the portal has a picker for it and admins were told to
- * use it. Without this, the one refresh that fixing the hash forces would reset
- * every icon back to the repo value — repeating the same silent loss in a
- * smaller way. The cost is that changing an icon in content.json will not
- * override a browser where it was set in the portal; use the portal, or clear
- * that browser's data.
+ * `icon` belongs here for content.json, because the portal has a picker for it
+ * and an admin's choice must not be reset by a repo file that predates it.
+ *
+ * It must NOT apply to a publish. On 4 September 2026 four category icons were
+ * changed in the portal and published, and no browser showed them: the
+ * incoming icon arrived correctly and was then discarded in favour of the one
+ * already stored. Publishing is a deliberate act by an admin, so for that
+ * source the published icon is the answer — the same reasoning that lets a
+ * publish delete, and content.json not.
+ *
+ * So this is passed in per source rather than being a constant.
  */
-const LOCAL_PREFERENCE_FIELDS = ['icon'] as const;
+const REPO_PREFERS_LOCAL = ['icon'] as const;
+const PUBLISH_PREFERS_LOCAL: readonly string[] = [];
 
 function stampOf(value: unknown): string {
   const serialised = JSON.stringify(value) ?? '';
@@ -190,7 +195,8 @@ function mergeTextMap(
 function mergeRecord(
   repoItem: Record<string, unknown>,
   localItem: Record<string, unknown> | undefined,
-  keepCounters: boolean
+  keepCounters: boolean,
+  preferLocal: readonly string[]
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = Object.assign({}, repoItem);
 
@@ -204,7 +210,7 @@ function mergeRecord(
   }
 
   if (localItem) {
-    for (const field of LOCAL_PREFERENCE_FIELDS) {
+    for (const field of preferLocal) {
       if (hasText(localItem[field])) merged[field] = localItem[field];
     }
   }
@@ -236,6 +242,7 @@ function mergeList(
   repoList: Record<string, unknown>[],
   localList: Record<string, unknown>[],
   keepCounters: boolean,
+  preferLocal: readonly string[],
   removableIds?: Set<string>
 ): MergeOutcome {
   const localById = new Map<string, Record<string, unknown>>();
@@ -257,7 +264,7 @@ function mergeList(
         }
       }
     }
-    return mergeRecord(repoItem, localItem, keepCounters);
+    return mergeRecord(repoItem, localItem, keepCounters, preferLocal);
   });
 
   const repoIds = new Set(repoList.map((r) => (typeof r.id === 'string' ? r.id : '')));
@@ -291,6 +298,7 @@ function syncOne(
   stampKey: string,
   backupKey: string,
   repoValue: Record<string, unknown>[],
+  preferLocal: readonly string[],
   removableIds?: Set<string>
 ): MergeOutcome & { skipped: boolean } {
   // The stamp is taken over the repo content exactly as it appears in
@@ -311,7 +319,7 @@ function syncOne(
     };
   }
 
-  const outcome = mergeList(repoValue, local, local.length > 0, removableIds);
+  const outcome = mergeList(repoValue, local, local.length > 0, preferLocal, removableIds);
 
   // Keep one copy of what was here before, so an unexpected merge is
   // recoverable: JSON.parse(localStorage.getItem('ngo_articles_before_last_sync'))
@@ -339,6 +347,7 @@ function mergeFrom(
   articlesIn: Record<string, unknown>[],
   source: string,
   stamps: { categories: string; articles: string },
+  preferLocal: readonly string[],
   removable?: { categories: Set<string>; articles: Set<string> }
 ): boolean {
   const categories = syncOne(
@@ -346,6 +355,7 @@ function mergeFrom(
     stamps.categories,
     BACKUP_KEYS.categories,
     categoriesIn,
+    preferLocal,
     removable && removable.categories
   );
   const articles = syncOne(
@@ -353,6 +363,7 @@ function mergeFrom(
     stamps.articles,
     BACKUP_KEYS.articles,
     articlesIn,
+    preferLocal,
     removable && removable.articles
   );
 
@@ -449,6 +460,9 @@ export async function syncPublishedContent(): Promise<boolean> {
       articles as Record<string, unknown>[],
       'the admin portal',
       STAMP_KEYS.published,
+      // A published icon is the admin's choice and must win, unlike one that
+      // merely sits in content.json.
+      PUBLISH_PREFERS_LOCAL,
       removable
     );
 
@@ -487,7 +501,8 @@ export function syncRepoContent(): void {
       INITIAL_CATEGORIES as unknown as Record<string, unknown>[],
       INITIAL_ARTICLES as unknown as Record<string, unknown>[],
       'content.json',
-      STAMP_KEYS.repo
+      STAMP_KEYS.repo,
+      REPO_PREFERS_LOCAL
     );
   } catch (error) {
     // Never block the app from rendering because of a storage problem
