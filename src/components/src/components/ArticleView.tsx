@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   Eye,
@@ -180,19 +181,33 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     setVoted(helpful ? 'yes' : 'no');
   };
 
+  /**
+   * Hands the reader a PDF, via the browser's own print dialogue.
+   *
+   * This used to save a .md file - the raw body text with a "# title" on top.
+   * Nobody outside software opens a .md, and it lost every bit of structure
+   * the guide has: steps, checklists, tables all came out as plain lines.
+   *
+   * Why the print dialogue rather than a PDF library
+   * ------------------------------------------------
+   * The guides exist in eight languages, six of them Indic scripts. A
+   * JavaScript PDF writer draws its own glyphs, so it needs a font embedded
+   * for every script it must render - Devanagari, Tamil, Telugu, Bengali,
+   * Gujarati, Kannada. Miss one and that language silently prints as empty
+   * boxes, which is the worst possible failure here: it would look fine in
+   * English and be useless to the readers the translations were done for.
+   *
+   * Printing uses the fonts already drawing the page, so every language works
+   * with nothing embedded and nothing to keep up to date. "Save as PDF" is in
+   * the print dialogue on Windows, macOS, Android and iOS.
+   *
+   * The count is incremented because this is still a download from the
+   * reader's point of view, even though no file leaves the page.
+   */
   const handleDownload = () => {
     incrementResourceDownload(article.id);
     setDownloadCount(prev => prev + 1);
-
-    const content = `# ${title}\n\nDownloaded from NGO Knowledge Hub\n\n${body}`;
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${article.slug || 'ngo_resource'}_Toolkit.md`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.print();
   };
 
   const handleBookmarkToggle = () => {
@@ -976,10 +991,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4 text-sky-200" />
-              Download this guide
+              Save as PDF
             </button>
             <p className="text-[11px] text-slate-400 mt-2 text-center">
-              {article.fileType || 'Text file'} · {downloadCount} downloads
+              Choose "Save as PDF" · {downloadCount} downloads
             </p>
           </div>
 
@@ -1011,6 +1026,91 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
           )}
         </aside>
       </div>
+
+      {/*
+        The printable guide.
+
+        Rendered into document.body through a portal so the print rules can
+        hide every other direct child of the body. Hiding the page with
+        visibility:hidden instead leaves its layout in place - that mistake
+        produced a correct assessment report followed by three blank sheets.
+
+        It reuses renderBlocks, the same renderer as the reading view. What a
+        line IS was decided once in parseArticle, so a step, checklist or
+        table cannot come out differently on paper than on screen.
+
+        Always mounted rather than toggled by a flag: window.print() is
+        synchronous, so a flag would have to wait for React to commit before
+        printing, and getting that wrong prints a blank page. Hidden on screen
+        costs nothing.
+      */}
+      {createPortal(
+        <>
+          <style>{`
+            #ngo-article-print { display: none; }
+            @media print {
+              html, body { height: auto !important; margin: 0 !important; padding: 0 !important; }
+              body > *:not(#ngo-article-print) { display: none !important; }
+              #ngo-article-print {
+                display: block !important;
+                color: #0f172a;
+                font-size: 11pt;
+                line-height: 1.55;
+              }
+              #ngo-article-print .ngo-print-head {
+                border-bottom: 2px solid #0f172a;
+                padding-bottom: 10px;
+                margin-bottom: 18px;
+              }
+              #ngo-article-print h1 { font-size: 18pt; margin: 0 0 4px; }
+              #ngo-article-print h2, #ngo-article-print h3 { page-break-after: avoid; }
+              #ngo-article-print table { page-break-inside: auto; width: 100%; }
+              #ngo-article-print tr, #ngo-article-print li { page-break-inside: avoid; }
+              #ngo-article-print section { page-break-inside: avoid; }
+              #ngo-article-print a { color: inherit; text-decoration: underline; }
+              /* A link is useless on paper unless the address is printed. */
+              #ngo-article-print a[href^="http"]::after {
+                content: " (" attr(href) ")";
+                font-size: 8.5pt;
+                word-break: break-all;
+              }
+              #ngo-article-print .ngo-print-foot {
+                margin-top: 22px;
+                padding-top: 8px;
+                border-top: 1px solid #94a3b8;
+                font-size: 9pt;
+                color: #475569;
+              }
+              @page { margin: 16mm; }
+            }
+          `}</style>
+          <div id="ngo-article-print" lang={currentLanguage}>
+            <div className="ngo-print-head">
+              <h1>{title}</h1>
+              {structure.subtitle && <p>{structure.subtitle}</p>}
+              <p style={{ fontSize: '9pt', color: '#475569', margin: '6px 0 0' }}>
+                NGO Knowledge Hub — Impact Foundation India
+              </p>
+            </div>
+
+            {renderBlocks(structure.intro, 'p-i')}
+            {structure.steps.map(step => (
+              <section key={'p-' + step.n} style={{ marginTop: '16px' }}>
+                <h3>{step.n}. {step.title}</h3>
+                {renderBlocks(step.blocks, 'p-s' + step.n + '-')}
+              </section>
+            ))}
+            {renderBlocks(structure.outro, 'p-o')}
+
+            <div className="ngo-print-foot">
+              Saved from ngo-hub.pages.dev on {new Date().toLocaleDateString()}.
+              Programmes and eligibility change — check the provider's own page
+              before applying.
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </article>
   );
 };
