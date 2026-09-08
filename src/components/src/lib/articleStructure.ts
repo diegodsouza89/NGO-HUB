@@ -137,7 +137,18 @@ export function parseArticle(body: string, articleTitle?: string): ArticleStruct
   const raw = String(body || '').replace(/\r\n?/g, '\n');
   const lines = raw.split('\n');
 
-  const norm = (s: string) => s.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  /**
+   * Reduce a line to comparable characters, in ANY script.
+   *
+   * This was /[^a-z0-9]/gi, which strips everything that is not a Latin
+   * letter or digit. For a Hindi, Tamil, Telugu, Bengali, Gujarati or Kannada
+   * title that leaves the empty string, the guard below goes falsy, and the
+   * body's repeated title is never removed - so those six languages showed the
+   * heading twice, on screen and on paper. It only ever worked in English.
+   *
+   * \p{L} and \p{N} are letters and numbers in every script.
+   */
+  const norm = (s: string) => s.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
   const titleKey = norm(articleTitle || '');
 
   const intro: Block[] = [];
