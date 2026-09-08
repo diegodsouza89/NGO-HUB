@@ -13,46 +13,130 @@
     "en": "This is a quick self-check, not an audit. It only knows what you tell it, and each area has just two questions — so treat it as a starting point for a conversation."
   },
   "ui": {
-    "back": { "en": "Back" },
-    "next": { "en": "Next" },
-    "seeResults": { "en": "See my results" },
-    "backToHub": { "en": "Back to the Knowledge Hub" },
-    "yourResult": { "en": "Your result" },
-    "answered": { "en": "{done} of {total} answered" },
-    "questionCount": { "en": "{current} of {total}" },
-    "areaByArea": { "en": "Area by area" },
-    "whereToStart": { "en": "Where to start" },
-    "weakestOne": { "en": "Your weakest area, and the guides here that help with it." },
-    "weakestMany": { "en": "Your {count} weakest areas, and the guides here that help with them." },
+    "back": {
+      "en": "Back"
+    },
+    "next": {
+      "en": "Next"
+    },
+    "seeResults": {
+      "en": "See my results"
+    },
+    "backToHub": {
+      "en": "Back to the Knowledge Hub"
+    },
+    "yourResult": {
+      "en": "Your result"
+    },
+    "answered": {
+      "en": "{done} of {total} answered"
+    },
+    "questionCount": {
+      "en": "{current} of {total}"
+    },
+    "areaByArea": {
+      "en": "Area by area"
+    },
+    "whereToStart": {
+      "en": "Where to start"
+    },
+    "weakestOne": {
+      "en": "Your weakest area, and the guides here that help with it."
+    },
+    "weakestMany": {
+      "en": "Your {count} weakest areas, and the guides here that help with them."
+    },
     "allGood": {
       "en": "Nothing is scoring badly, so there is no single weak spot to point you at. The free programmes in this Hub are still worth a look — many go unclaimed simply because nobody applied."
     },
-    "noGuide": { "en": "No guide covers this yet." },
-    "browse": { "en": "Browse {name}" },
-    "startAgain": { "en": "Start again" },
-    "browseAll": { "en": "Browse all guides" },
+    "noGuide": {
+      "en": "No guide covers this yet."
+    },
+    "browse": {
+      "en": "Browse {name}"
+    },
+    "startAgain": {
+      "en": "Start again"
+    },
+    "browseAll": {
+      "en": "Browse all guides"
+    },
     "unsureNote": {
       "en": "You answered “I am not sure” {count} times. Those count as zero here, but they matter more than a plain no — if nobody knows who looks after something, that is the gap."
     },
-    "privacy": { "en": "Your answers stay in this browser and are not sent anywhere." }
+    "privacy": {
+      "en": "Your answers stay in this browser and are not sent anywhere."
+    }
   },
   "options": [
-    { "value": 0, "labels": { "en": "No, not yet" } },
-    { "value": 1, "labels": { "en": "We have started" } },
-    { "value": 2, "labels": { "en": "Mostly done" } },
-    { "value": 3, "labels": { "en": "Yes, fully" } },
-    { "value": 0, "labels": { "en": "I am not sure" }, "unsure": true }
+    {
+      "value": 0,
+      "labels": {
+        "en": "No, not yet"
+      }
+    },
+    {
+      "value": 1,
+      "labels": {
+        "en": "We have started"
+      }
+    },
+    {
+      "value": 2,
+      "labels": {
+        "en": "Mostly done"
+      }
+    },
+    {
+      "value": 3,
+      "labels": {
+        "en": "Yes, fully"
+      }
+    },
+    {
+      "value": 0,
+      "labels": {
+        "en": "I am not sure"
+      },
+      "unsure": true
+    }
   ],
   "areaBands": [
-    { "max": 1, "labels": { "en": "Needs work" }, "tone": "risk" },
-    { "max": 3, "labels": { "en": "Getting there" }, "tone": "warn" },
-    { "max": 5, "labels": { "en": "Good" }, "tone": "ok" },
-    { "max": 6, "labels": { "en": "Very strong" }, "tone": "strong" }
+    {
+      "max": 1,
+      "labels": {
+        "en": "Needs work"
+      },
+      "tone": "risk"
+    },
+    {
+      "max": 3,
+      "labels": {
+        "en": "Getting there"
+      },
+      "tone": "warn"
+    },
+    {
+      "max": 5,
+      "labels": {
+        "en": "Good"
+      },
+      "tone": "ok"
+    },
+    {
+      "max": 6,
+      "labels": {
+        "en": "Very strong"
+      },
+      "tone": "strong"
+    }
   ],
   "overallBands": [
     {
       "max": 9,
-      "labels": { "en": "Just beginning" },
+      "labels": {
+        "en": "Just beginning"
+      },
       "summaries": {
         "en": "Most of the basics are still ahead of you. That is a normal place to be, and the first steps are the cheapest ones: register for free software, get email with your own name on it, and turn on the phone code at login."
       },
@@ -60,7 +144,9 @@
     },
     {
       "max": 17,
-      "labels": { "en": "Making progress" },
+      "labels": {
+        "en": "Making progress"
+      },
       "summaries": {
         "en": "Some things are working and some are missing. The most useful work now is closing the gaps rather than adding new tools — especially anywhere you answered “not sure”."
       },
@@ -68,7 +154,9 @@
     },
     {
       "max": 24,
-      "labels": { "en": "In good shape" },
+      "labels": {
+        "en": "In good shape"
+      },
       "summaries": {
         "en": "The basics are mostly in place. From here the gains come from tidying up: one system instead of several, backups you have actually tested, and reports you can produce without starting over."
       },
@@ -76,7 +164,9 @@
     },
     {
       "max": 30,
-      "labels": { "en": "Very strong" },
+      "labels": {
+        "en": "Very strong"
+      },
       "summaries": {
         "en": "You are ahead of most organisations your size. The free programmes here are still worth checking — a lot go unclaimed simply because nobody applied."
       },
@@ -86,11 +176,15 @@
   "areas": [
     {
       "id": "foundations",
-      "names": { "en": "Getting free software" },
+      "names": {
+        "en": "Getting free software"
+      },
       "descriptions": {
         "en": "Whether you can claim the free and low-cost software your NGO is entitled to."
       },
-      "categoryIds": ["cat-4558"],
+      "categoryIds": [
+        "cat-9701"
+      ],
       "advice": {
         "en": "Most free software programmes start with one check of your NGO's registration. Do it once and many of them open up."
       },
@@ -111,11 +205,16 @@
     },
     {
       "id": "workspace",
-      "names": { "en": "Email and files" },
+      "names": {
+        "en": "Email and files"
+      },
       "descriptions": {
         "en": "The email and file tools your team uses every day."
       },
-      "categoryIds": ["cat-tech-grants", "cat-9438"],
+      "categoryIds": [
+        "cat-tech-grants",
+        "cat-9438"
+      ],
       "advice": {
         "en": "Email with your own name on it looks professional to funders. And files kept in the organisation's account do not walk out of the door when someone leaves."
       },
@@ -136,11 +235,17 @@
     },
     {
       "id": "security",
-      "names": { "en": "Safety and backups" },
+      "names": {
+        "en": "Safety and backups"
+      },
       "descriptions": {
         "en": "Keeping accounts safe, and being able to get your files back."
       },
-      "categoryIds": ["cat-8222", "cat-2967", "cat-9701"],
+      "categoryIds": [
+        "cat-8222",
+        "cat-2967",
+        "cat-9701"
+      ],
       "advice": {
         "en": "A code on your phone at login stops most break-ins and costs nothing. And a backup nobody has ever opened is only a hope."
       },
@@ -161,11 +266,16 @@
     },
     {
       "id": "outreach",
-      "names": { "en": "Website and reaching people" },
+      "names": {
+        "en": "Website and reaching people"
+      },
       "descriptions": {
         "en": "How funders, supporters and communities find you and hear from you."
       },
-      "categoryIds": ["cat-5421", "cat-2894"],
+      "categoryIds": [
+        "cat-2967",
+        "cat-9701"
+      ],
       "advice": {
         "en": "A funder will look you up before they reply to you. Make sure what they find is current."
       },
@@ -186,11 +296,16 @@
     },
     {
       "id": "data",
-      "names": { "en": "Data and reports" },
+      "names": {
+        "en": "Data and reports"
+      },
       "descriptions": {
         "en": "Keeping your programme records in order, and getting reports out of them."
       },
-      "categoryIds": ["cat-9641", "cat-3829", "cat-6732"],
+      "categoryIds": [
+        "cat-9701",
+        "cat-9438"
+      ],
       "advice": {
         "en": "If every report means rebuilding the numbers, the problem is where the data sits — not how hard your team works."
       },
