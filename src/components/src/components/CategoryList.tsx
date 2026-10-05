@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 import { CategoryIcon } from '../lib/categoryIcons';
+import CategoryArt from './CategoryArt';
 
 interface CategoryListProps {
   categories: Category[];
@@ -85,6 +86,8 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                     className="group bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:border-sky-500 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden"
                   >
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                    <CategoryArt title={cat.names.en || cat.id} />
 
                     <div>
                       <div className="flex items-center justify-between mb-4">

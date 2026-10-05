@@ -102,20 +102,6 @@ export const SelfAssessment: React.FC<SelfAssessmentProps> = ({
             {text(ASSESSMENT.intros)}
           </p>
 
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {ASSESSMENT.areas.map((area) => (
-              <div
-                key={area.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-3"
-              >
-                <div className="text-sm font-bold text-slate-900">{text(area.names, area.id)}</div>
-                <div className="text-xs text-slate-500 leading-relaxed mt-0.5">
-                  {text(area.descriptions)}
-                </div>
-              </div>
-            ))}
-          </div>
-
           <button
             onClick={() => setStage('asking')}
             className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-sky-700 hover:bg-sky-800 text-white font-semibold px-6 py-3 text-sm shadow-md transition-colors cursor-pointer"
