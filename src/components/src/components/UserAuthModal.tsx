@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Building2, User, Mail, Briefcase, Globe, LogIn, UserPlus, CheckCircle2 } from 'lucide-react';
-import { registerUser, loginUser } from '../lib/storage';
+import { X, Building2, User, Mail, Briefcase, Globe, LogIn, UserPlus } from 'lucide-react';
+import { setCurrentUser } from '../lib/storage';
+import { registerMember, loginMember } from '../lib/members';
 import { User as UserType } from '../types';
 
 interface UserAuthModalProps {
@@ -20,27 +21,11 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
   const [role, setRole] = useState('Program Manager');
   const [sector, setSector] = useState('Education & Rural Development');
 
-  // Quick Demo Prefills
-  const prefillDemoUser = (demoEmail: string, demoName: string, demoOrg: string, demoRole: string, demoSector: string) => {
-    try {
-      setError(null);
-      const user = registerUser({
-        name: demoName,
-        email: demoEmail,
-        organizationName: demoOrg,
-        role: demoRole,
-        sector: demoSector,
-      });
-      onSuccess(user);
-      onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
-    }
-  };
+  const [busy, setBusy] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -49,22 +34,19 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
       return;
     }
 
-    try {
-      const user = registerUser({
-        name,
-        email,
-        organizationName,
-        role,
-        sector,
-      });
-      onSuccess(user);
-      onClose();
-    } catch (err: any) {
-      setError(err.message || 'Registration failed.');
+    setBusy(true);
+    const result = await registerMember({ name, email, organizationName, role, sector });
+    setBusy(false);
+    if (!result.ok || !result.data) {
+      setError(result.error || 'Registration failed.');
+      return;
     }
+    setCurrentUser(result.data);
+    onSuccess(result.data);
+    onClose();
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -73,17 +55,16 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
       return;
     }
 
-    try {
-      const user = loginUser(email);
-      if (!user) {
-        setError('No account found with this email. Please register your NGO details first.');
-        return;
-      }
-      onSuccess(user);
-      onClose();
-    } catch (err: any) {
-      setError(err.message || 'Login failed.');
+    setBusy(true);
+    const result = await loginMember(email);
+    setBusy(false);
+    if (!result.ok || !result.data) {
+      setError(result.error || 'Login failed.');
+      return;
     }
+    setCurrentUser(result.data);
+    onSuccess(result.data);
+    onClose();
   };
 
   return (
@@ -156,7 +137,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Priya Sharma"
+                    placeholder="Your full name"
                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
                   />
                 </div>
@@ -173,7 +154,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="priya@samparkfoundation.org"
+                    placeholder="you@yourngo.org"
                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
                   />
                 </div>
@@ -190,7 +171,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
                     required
                     value={organizationName}
                     onChange={(e) => setOrganizationName(e.target.value)}
-                    placeholder="Sampark Rural Development Foundation"
+                    placeholder="Your organisation name"
                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
                   />
                 </div>
@@ -242,7 +223,8 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
 
               <button
                 type="submit"
-                className="w-full mt-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+                disabled={busy}
+                className="disabled:opacity-60 w-full mt-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
               >
                 <UserPlus className="w-4 h-4" />
                 Complete NGO Registration & Access
@@ -261,7 +243,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. priya.sharma@samparkfoundation.org"
+                    placeholder="you@yourngo.org"
                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
                   />
                 </div>
@@ -269,7 +251,8 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+                disabled={busy}
+                className="disabled:opacity-60 w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
                 Sign In to Knowledge Portal
@@ -277,53 +260,6 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
             </form>
           )}
 
-          {/* Quick Demo NGO Accounts */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-              Instant Demo Access (1-Click Login)
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  prefillDemoUser(
-                    'priya.sharma@samparkfoundation.org',
-                    'Priya Sharma',
-                    'Sampark Rural Foundation',
-                    'Executive Director',
-                    'Education & Rural Development'
-                  )
-                }
-                className="text-left p-2.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg transition-colors group"
-              >
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-sky-800">
-                  <span>Priya Sharma</span>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="text-[11px] text-slate-500 truncate">Executive Director • Sampark NGO</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  prefillDemoUser(
-                    'rajesh@aarogyatrust.org',
-                    'Dr. Rajesh Kulkarni',
-                    'Aarogya Public Health Trust',
-                    'Program Manager',
-                    'Healthcare'
-                  )
-                }
-                className="text-left p-2.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg transition-colors group"
-              >
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-sky-800">
-                  <span>Dr. Rajesh Kulkarni</span>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="text-[11px] text-slate-500 truncate">Program Manager • Aarogya Health</div>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
