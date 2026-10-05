@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { fetchMembers } from '../../lib/members';
 import { 
   Eye, 
   FileText, 
@@ -33,6 +34,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onEditArticle,
   onCreateNewArticle,
 }) => {
+  // Member counts come from the server; re-render once they arrive.
+  const [, setMembersLoaded] = useState(0);
+  useEffect(() => {
+    fetchMembers().then((r) => { if (r.ok) setMembersLoaded((n) => n + 1); });
+  }, []);
   const analytics = getAnalyticsData();
   const maxDayViews = Math.max(...analytics.days.map(d => d.views), 10);
   const openTicketsCount = tickets.filter(t => t.status === 'open').length;

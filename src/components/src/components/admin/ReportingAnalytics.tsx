@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { fetchMembers } from '../../lib/members';
 import { 
   FileBarChart, 
   Download, 
@@ -19,6 +20,11 @@ import {
 } from '../../lib/storage';
 
 export const ReportingAnalytics: React.FC = () => {
+  // Member counts come from the server; re-render once they arrive.
+  const [, setMembersLoaded] = useState(0);
+  useEffect(() => {
+    fetchMembers().then((r) => { if (r.ok) setMembersLoaded((n) => n + 1); });
+  }, []);
   const analytics = getAnalyticsData();
 
   const handleDownloadReport = (type: 'users' | 'logins' | 'resources') => {

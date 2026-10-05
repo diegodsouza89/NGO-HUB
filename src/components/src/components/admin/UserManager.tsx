@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Users, 
   Search, 
@@ -12,31 +12,79 @@ import {
   CheckCircle, 
   Ban,
   FileSpreadsheet,
-  Globe
+  Globe,
+  RefreshCw,
+  Trash2,
+  KeyRound
 } from 'lucide-react';
 import { User, LoginLog } from '../../types';
 import { 
-  getUsers, 
-  getLoginLogs, 
-  toggleUserStatus, 
   exportUsersCSV, 
   exportLoginLogsCSV 
 } from '../../lib/storage';
+import { fetchMembers, getCachedMembers, setMemberStatus, deleteMember } from '../../lib/members';
+import { getAdminKey, setAdminKey } from '../../lib/tickets';
 
 export const UserManager: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(getUsers());
-  const [loginLogs] = useState<LoginLog[]>(getLoginLogs());
+  const [users, setUsers] = useState<User[]>(getCachedMembers().users);
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>(getCachedMembers().loginLogs);
   const [searchTerm, setSearchTerm] = useState('');
   const [sectorFilter, setSectorFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [needsKey, setNeedsKey] = useState(!getAdminKey());
+  const [keyInput, setKeyInput] = useState('');
 
-  const handleToggleStatus = (userId: string) => {
-    toggleUserStatus(userId);
-    setUsers(getUsers());
-    if (selectedUser && selectedUser.id === userId) {
-      const updated = getUsers().find(u => u.id === userId);
-      if (updated) setSelectedUser(updated);
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    const r = await fetchMembers();
+    setLoading(false);
+    if (!r.ok || !r.data) {
+      if (r.status === 401) setNeedsKey(true);
+      setLoadError(r.error || 'Could not load members.');
+      return;
     }
+    setNeedsKey(false);
+    setUsers(r.data.users);
+    setLoginLogs(r.data.loginLogs);
+  };
+
+  useEffect(() => {
+    if (getAdminKey()) load();
+  }, []);
+
+  const handleSaveKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyInput.trim()) return;
+    setAdminKey(keyInput.trim());
+    setKeyInput('');
+    load();
+  };
+
+  const handleToggleStatus = async (userId: string) => {
+    const u = users.find(x => x.id === userId);
+    if (!u) return;
+    const next = u.status === 'active' ? 'suspended' : 'active';
+    const r = await setMemberStatus(userId, next);
+    if (!r.ok) {
+      setLoadError(r.error || 'Could not change status.');
+      return;
+    }
+    await load();
+    if (selectedUser && selectedUser.id === userId) setSelectedUser({ ...selectedUser, status: next });
+  };
+
+  const handleDelete = async (u: User) => {
+    if (!window.confirm(`Delete ${u.name} (${u.email}) and their login history? This cannot be undone.`)) return;
+    const r = await deleteMember(u.id);
+    if (!r.ok) {
+      setLoadError(r.error || 'Could not delete member.');
+      return;
+    }
+    if (selectedUser && selectedUser.id === u.id) setSelectedUser(null);
+    await load();
   };
 
   const filteredUsers = users.filter((u) => {
@@ -97,6 +145,14 @@ export const UserManager: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={load}
+            disabled={loading}
+            className="py-2 px-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-2 disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
             onClick={handleDownloadUsersCSV}
             className="py-2 px-3.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-2"
           >
@@ -112,6 +168,28 @@ export const UserManager: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {needsKey && (
+        <form onSubmit={handleSaveKey} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-amber-900 flex-1">
+            <KeyRound className="w-4 h-4" />
+            Member records are stored securely on the server. Enter the admin key (same as Support Tickets) to view them.
+          </div>
+          <input
+            type="password"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            placeholder="TICKETS_ADMIN_KEY"
+            className="px-3 py-2 text-sm border border-amber-300 rounded-lg bg-white"
+          />
+          <button type="submit" className="py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg">
+            Unlock
+          </button>
+        </form>
+      )}
+      {loadError && !needsKey && (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-xl p-3">{loadError}</div>
+      )}
 
       {/* Filters & Search Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -161,7 +239,11 @@ export const UserManager: React.FC = () => {
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-500 text-sm">
-                    No NGO users found matching your search query.
+                    {loading
+                      ? 'Loading members…'
+                      : users.length === 0
+                        ? 'No members have registered yet.'
+                        : 'No NGO users found matching your search query.'}
                   </td>
                 </tr>
               ) : (
@@ -241,6 +323,14 @@ export const UserManager: React.FC = () => {
                         }`}
                       >
                         {u.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(u)}
+                        title="Delete member"
+                        className="p-1.5 rounded-lg transition-colors inline-flex items-center text-xs font-medium text-slate-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
