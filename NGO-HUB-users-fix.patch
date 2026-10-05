@@ -1,0 +1,1272 @@
+diff --git a/USERS-SCHEMA.sql b/USERS-SCHEMA.sql
+new file mode 100644
+index 0000000..bfa49b6
+--- /dev/null
++++ b/USERS-SCHEMA.sql
+@@ -0,0 +1,18 @@
++-- Member accounts for the NGO Knowledge Hub.
++-- /api/users creates these tables automatically on first use; this file is
++-- for reference, or to create them by hand in the D1 Console.
++
++CREATE TABLE IF NOT EXISTS members (
++  id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
++  organization_name TEXT, role TEXT, sector TEXT,
++  registered_at TEXT NOT NULL, last_login_at TEXT, login_count INTEGER NOT NULL DEFAULT 0,
++  page_views_count INTEGER NOT NULL DEFAULT 0, downloads_count INTEGER NOT NULL DEFAULT 0,
++  saved_resource_ids TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'active', ip_hash TEXT
++);
++CREATE TABLE IF NOT EXISTS member_logins (
++  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, user_email TEXT,
++  organization_name TEXT, role TEXT, timestamp INTEGER NOT NULL, date TEXT NOT NULL, device TEXT
++);
++CREATE INDEX IF NOT EXISTS idx_member_logins_ts ON member_logins (timestamp DESC);
++CREATE INDEX IF NOT EXISTS idx_member_logins_user ON member_logins (user_id);
++CREATE INDEX IF NOT EXISTS idx_members_ip ON members (ip_hash, registered_at);
+diff --git a/functions/api/users.js b/functions/api/users.js
+new file mode 100644
+index 0000000..a2e1640
+--- /dev/null
++++ b/functions/api/users.js
+@@ -0,0 +1,348 @@
++/**
++ * Cloudflare Pages Function - /api/users
++ *
++ * WHY THIS EXISTS
++ * ---------------
++ * Registered members used to live only in each visitor's own browser
++ * (localStorage "ngo_users"). That had three problems:
++ *   1. The admin's "NGO Users" screen only ever showed people who had signed
++ *      in on the admin's own browser - plus two fake demo accounts (Priya
++ *      Sharma, Dr. Rajesh Kulkarni) seeded into every browser.
++ *   2. Anyone who signed in on a shared computer left their name, email and
++ *      organisation in that browser for the next person.
++ *   3. Nothing was ever collected centrally.
++ *
++ * Members and their login history now live in the same Cloudflare D1 database
++ * as support tickets. Visitors' browsers keep only their OWN profile.
++ *
++ * METHODS
++ *   POST   /api/users   public  - { action: 'register' | 'login' | 'activity', ... }
++ *   GET    /api/users   admin   - list members + recent login history
++ *   PATCH  /api/users   admin   - { id, status: 'active' | 'suspended' }
++ *   DELETE /api/users   admin   - { id }  remove a member and their history
++ *
++ * Admin calls need header x-admin-key = TICKETS_ADMIN_KEY (the same key the
++ * Support Tickets tab already uses). Tables are created automatically on first
++ * use - USERS-SCHEMA.sql documents them.
++ */
++
++const MAX = { name: 120, email: 200, org: 200, role: 120, sector: 120, device: 80 };
++const STATUSES = ['active', 'suspended'];
++const MAX_REGISTRATIONS_PER_HOUR = 10;
++const LOG_LIMIT = 2000;
++
++function json(body, status) {
++  return new Response(JSON.stringify(body), {
++    status: status || 200,
++    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
++  });
++}
++
++function str(v) {
++  return typeof v === 'string' ? v : v == null ? '' : String(v);
++}
++
++function trim(v, max) {
++  return str(v).replace(/\s+/g, ' ').trim().slice(0, max);
++}
++
++function looksLikeEmail(value) {
++  return /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(value);
++}
++
++function safeEqual(a, b) {
++  const x = str(a);
++  const y = str(b);
++  if (x.length !== y.length) return false;
++  let diff = 0;
++  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
++  return diff === 0;
++}
++
++async function sha256Hex(value) {
++  const bytes = new TextEncoder().encode(str(value));
++  const digest = await crypto.subtle.digest('SHA-256', bytes);
++  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
++}
++
++function randomId(prefix) {
++  return prefix + Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
++}
++
++function parseIds(value) {
++  try {
++    const arr = JSON.parse(value || '[]');
++    return Array.isArray(arr) ? arr.map(str).slice(0, 500) : [];
++  } catch (e) {
++    return [];
++  }
++}
++
++function rowToUser(row) {
++  return {
++    id: row.id,
++    name: row.name,
++    email: row.email,
++    organizationName: row.organization_name || '',
++    role: row.role || '',
++    sector: row.sector || '',
++    registeredAt: row.registered_at,
++    lastLoginAt: row.last_login_at,
++    loginCount: Number(row.login_count) || 0,
++    pageViewsCount: Number(row.page_views_count) || 0,
++    downloadsCount: Number(row.downloads_count) || 0,
++    savedResourceIds: parseIds(row.saved_resource_ids),
++    status: row.status === 'suspended' ? 'suspended' : 'active',
++  };
++}
++
++function rowToLog(row) {
++  return {
++    id: row.id,
++    userId: row.user_id,
++    userName: row.user_name,
++    userEmail: row.user_email,
++    organizationName: row.organization_name || '',
++    role: row.role || '',
++    timestamp: Number(row.timestamp),
++    date: row.date,
++    device: row.device || '',
++  };
++}
++
++let schemaReady = false;
++async function ensureSchema(db) {
++  if (schemaReady) return;
++  await db.batch([
++    db.prepare(
++      'CREATE TABLE IF NOT EXISTS members (' +
++        'id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, ' +
++        'organization_name TEXT, role TEXT, sector TEXT, ' +
++        'registered_at TEXT NOT NULL, last_login_at TEXT, login_count INTEGER NOT NULL DEFAULT 0, ' +
++        'page_views_count INTEGER NOT NULL DEFAULT 0, downloads_count INTEGER NOT NULL DEFAULT 0, ' +
++        "saved_resource_ids TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'active', ip_hash TEXT)"
++    ),
++    db.prepare(
++      'CREATE TABLE IF NOT EXISTS member_logins (' +
++        'id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, user_email TEXT, ' +
++        'organization_name TEXT, role TEXT, timestamp INTEGER NOT NULL, date TEXT NOT NULL, device TEXT)'
++    ),
++    db.prepare('CREATE INDEX IF NOT EXISTS idx_member_logins_ts ON member_logins (timestamp DESC)'),
++    db.prepare('CREATE INDEX IF NOT EXISTS idx_member_logins_user ON member_logins (user_id)'),
++    db.prepare('CREATE INDEX IF NOT EXISTS idx_members_ip ON members (ip_hash, registered_at)'),
++  ]);
++  schemaReady = true;
++}
++
++function requireDb(env) {
++  const db = env && env.DB;
++  if (!db || typeof db.prepare !== 'function') {
++    return json({ error: 'Member accounts are not connected yet.', detail: 'No D1 binding named DB.' }, 503);
++  }
++  return null;
++}
++
++function requireAdmin(request, env) {
++  const expected = str(env && env.TICKETS_ADMIN_KEY).trim();
++  if (!expected) return json({ error: 'Set TICKETS_ADMIN_KEY in Cloudflare to view members.' }, 503);
++  if (!safeEqual(request.headers.get('x-admin-key'), expected)) {
++    return json({ error: 'That admin key is not correct.' }, 401);
++  }
++  return null;
++}
++
++async function recordLogin(db, user, device) {
++  const now = Date.now();
++  await db
++    .prepare(
++      'INSERT INTO member_logins (id, user_id, user_name, user_email, organization_name, role, timestamp, date, device) ' +
++        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
++    )
++    .bind(
++      randomId('log-'),
++      user.id,
++      user.name,
++      user.email,
++      user.organizationName,
++      user.role,
++      now,
++      new Date(now).toISOString().slice(0, 10),
++      device
++    )
++    .run();
++}
++
++/* -------------------------------------------------------------------- POST */
++
++async function handlePost(request, env) {
++  let p;
++  try {
++    p = await request.json();
++  } catch (e) {
++    return json({ error: 'Could not read the form. Please try again.' }, 400);
++  }
++  const action = trim(p && p.action, 20);
++  const email = trim(p && p.email, MAX.email).toLowerCase();
++  const device = trim(p && p.device, MAX.device) || 'Browser';
++  const db = env.DB;
++
++  if (!email || !looksLikeEmail(email)) {
++    return json({ error: 'Please enter a valid email address.' }, 400);
++  }
++
++  const existing = await db.prepare('SELECT * FROM members WHERE email = ?').bind(email).first();
++
++  if (action === 'register') {
++    const name = trim(p.name, MAX.name);
++    const org = trim(p.organizationName, MAX.org);
++    const role = trim(p.role, MAX.role) || 'NGO Professional';
++    const sector = trim(p.sector, MAX.sector) || 'All Sectors';
++    if (!name || !org) return json({ error: 'Please fill in your name and organisation.' }, 400);
++    const nowIso = new Date().toISOString();
++
++    if (existing) {
++      if (existing.status === 'suspended') {
++        return json({ error: 'This account has been suspended by the administrator.' }, 403);
++      }
++      await db
++        .prepare(
++          'UPDATE members SET name = ?, organization_name = ?, role = ?, sector = ?, last_login_at = ?, login_count = login_count + 1 WHERE id = ?'
++        )
++        .bind(name, org, role, sector, nowIso, existing.id)
++        .run();
++    } else {
++      const ipHash = await sha256Hex(request.headers.get('CF-Connecting-IP') || 'unknown');
++      const since = new Date(Date.now() - 3600 * 1000).toISOString();
++      const recent = await db
++        .prepare('SELECT COUNT(*) AS n FROM members WHERE ip_hash = ? AND registered_at > ?')
++        .bind(ipHash, since)
++        .first();
++      if (recent && Number(recent.n) >= MAX_REGISTRATIONS_PER_HOUR) {
++        return json({ error: 'Too many registrations from this network. Please try again later.' }, 429);
++      }
++      await db
++        .prepare(
++          'INSERT INTO members (id, name, email, organization_name, role, sector, registered_at, last_login_at, login_count, status, ip_hash) ' +
++            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'active', ?)"
++        )
++        .bind(randomId('usr-'), name, email, org, role, sector, nowIso, nowIso, ipHash)
++        .run();
++    }
++    const row = await db.prepare('SELECT * FROM members WHERE email = ?').bind(email).first();
++    const user = rowToUser(row);
++    await recordLogin(db, user, device);
++    return json({ user }, existing ? 200 : 201);
++  }
++
++  if (action === 'login') {
++    if (!existing) {
++      return json({ error: 'No account found with this email. Please register your NGO details first.' }, 404);
++    }
++    if (existing.status === 'suspended') {
++      return json({ error: 'This account has been suspended by the administrator.' }, 403);
++    }
++    await db
++      .prepare('UPDATE members SET last_login_at = ?, login_count = login_count + 1 WHERE id = ?')
++      .bind(new Date().toISOString(), existing.id)
++      .run();
++    const row = await db.prepare('SELECT * FROM members WHERE id = ?').bind(existing.id).first();
++    const user = rowToUser(row);
++    await recordLogin(db, user, device);
++    return json({ user });
++  }
++
++  if (action === 'activity') {
++    // Counters for the member's own page views / downloads / bookmarks.
++    // Requires id + email to match so one member cannot touch another's row.
++    const id = trim(p.id, 80);
++    if (!existing || existing.id !== id) return json({ error: 'Unknown member.' }, 404);
++    const kind = trim(p.kind, 20);
++    if (kind === 'view') {
++      await db.prepare('UPDATE members SET page_views_count = page_views_count + 1 WHERE id = ?').bind(id).run();
++    } else if (kind === 'download') {
++      await db.prepare('UPDATE members SET downloads_count = downloads_count + 1 WHERE id = ?').bind(id).run();
++    } else if (kind === 'bookmarks') {
++      const ids = Array.isArray(p.savedResourceIds) ? p.savedResourceIds.map((x) => trim(x, 80)).slice(0, 500) : [];
++      await db.prepare('UPDATE members SET saved_resource_ids = ? WHERE id = ?').bind(JSON.stringify(ids), id).run();
++    } else {
++      return json({ error: 'Unknown activity.' }, 400);
++    }
++    return json({ ok: true });
++  }
++
++  return json({ error: 'Unknown action.' }, 400);
++}
++
++/* ------------------------------------------------------------------- admin */
++
++async function listMembers(env) {
++  const db = env.DB;
++  const users = await db.prepare('SELECT * FROM members ORDER BY registered_at DESC').all();
++  const logs = await db
++    .prepare('SELECT * FROM member_logins ORDER BY timestamp DESC LIMIT ?')
++    .bind(LOG_LIMIT)
++    .all();
++  return json({
++    users: (users.results || []).map(rowToUser),
++    loginLogs: (logs.results || []).map(rowToLog),
++  });
++}
++
++async function updateMember(request, env) {
++  let p;
++  try {
++    p = await request.json();
++  } catch (e) {
++    return json({ error: 'Could not read the request.' }, 400);
++  }
++  const id = trim(p && p.id, 80);
++  const status = trim(p && p.status, 20);
++  if (!id || STATUSES.indexOf(status) === -1) return json({ error: 'Send an id and a valid status.' }, 400);
++  const r = await env.DB.prepare('UPDATE members SET status = ? WHERE id = ?').bind(status, id).run();
++  if (r && r.meta && r.meta.changes === 0) return json({ error: 'No member with that id.' }, 404);
++  return json({ id, status });
++}
++
++async function deleteMember(request, env) {
++  let p;
++  try {
++    p = await request.json();
++  } catch (e) {
++    return json({ error: 'Could not read the request.' }, 400);
++  }
++  const id = trim(p && p.id, 80);
++  if (!id) return json({ error: 'Which member? No id was sent.' }, 400);
++  await env.DB.batch([
++    env.DB.prepare('DELETE FROM member_logins WHERE user_id = ?').bind(id),
++    env.DB.prepare('DELETE FROM members WHERE id = ?').bind(id),
++  ]);
++  return json({ id, deleted: true });
++}
++
++/* ------------------------------------------------------------------- route */
++
++export async function onRequest(context) {
++  const { request, env } = context;
++  if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
++
++  const noDb = requireDb(env);
++  if (noDb) return noDb;
++
++  try {
++    await ensureSchema(env.DB);
++
++    if (request.method === 'POST') return await handlePost(request, env);
++
++    if (['GET', 'PATCH', 'DELETE'].indexOf(request.method) !== -1) {
++      const denied = requireAdmin(request, env);
++      if (denied) return denied;
++      if (request.method === 'GET') return await listMembers(env);
++      if (request.method === 'PATCH') return await updateMember(request, env);
++      return await deleteMember(request, env);
++    }
++    return json({ error: 'Method not allowed.' }, 405);
++  } catch (e) {
++    const detail = e && e.message ? String(e.message) : String(e);
++    return json({ error: 'The member database could not be reached. Please try again.', detail: detail.slice(0, 300) }, 502);
++  }
++}
+diff --git a/src/components/src/components/UserAuthModal.tsx b/src/components/src/components/UserAuthModal.tsx
+index be21705..31f3f73 100644
+--- a/src/components/src/components/UserAuthModal.tsx
++++ b/src/components/src/components/UserAuthModal.tsx
+@@ -1,6 +1,7 @@
+ import React, { useState } from 'react';
+-import { X, Building2, User, Mail, Briefcase, Globe, LogIn, UserPlus, CheckCircle2 } from 'lucide-react';
+-import { registerUser, loginUser } from '../lib/storage';
++import { X, Building2, User, Mail, Briefcase, Globe, LogIn, UserPlus } from 'lucide-react';
++import { setCurrentUser } from '../lib/storage';
++import { registerMember, loginMember } from '../lib/members';
+ import { User as UserType } from '../types';
+ 
+ interface UserAuthModalProps {
+@@ -20,27 +21,11 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+   const [role, setRole] = useState('Program Manager');
+   const [sector, setSector] = useState('Education & Rural Development');
+ 
+-  // Quick Demo Prefills
+-  const prefillDemoUser = (demoEmail: string, demoName: string, demoOrg: string, demoRole: string, demoSector: string) => {
+-    try {
+-      setError(null);
+-      const user = registerUser({
+-        name: demoName,
+-        email: demoEmail,
+-        organizationName: demoOrg,
+-        role: demoRole,
+-        sector: demoSector,
+-      });
+-      onSuccess(user);
+-      onClose();
+-    } catch (err: any) {
+-      setError(err.message || 'Failed to sign in');
+-    }
+-  };
++  const [busy, setBusy] = useState(false);
+ 
+   if (!isOpen) return null;
+ 
+-  const handleRegisterSubmit = (e: React.FormEvent) => {
++  const handleRegisterSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setError(null);
+ 
+@@ -49,22 +34,19 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+       return;
+     }
+ 
+-    try {
+-      const user = registerUser({
+-        name,
+-        email,
+-        organizationName,
+-        role,
+-        sector,
+-      });
+-      onSuccess(user);
+-      onClose();
+-    } catch (err: any) {
+-      setError(err.message || 'Registration failed.');
++    setBusy(true);
++    const result = await registerMember({ name, email, organizationName, role, sector });
++    setBusy(false);
++    if (!result.ok || !result.data) {
++      setError(result.error || 'Registration failed.');
++      return;
+     }
++    setCurrentUser(result.data);
++    onSuccess(result.data);
++    onClose();
+   };
+ 
+-  const handleLoginSubmit = (e: React.FormEvent) => {
++  const handleLoginSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setError(null);
+ 
+@@ -73,17 +55,16 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+       return;
+     }
+ 
+-    try {
+-      const user = loginUser(email);
+-      if (!user) {
+-        setError('No account found with this email. Please register your NGO details first.');
+-        return;
+-      }
+-      onSuccess(user);
+-      onClose();
+-    } catch (err: any) {
+-      setError(err.message || 'Login failed.');
++    setBusy(true);
++    const result = await loginMember(email);
++    setBusy(false);
++    if (!result.ok || !result.data) {
++      setError(result.error || 'Login failed.');
++      return;
+     }
++    setCurrentUser(result.data);
++    onSuccess(result.data);
++    onClose();
+   };
+ 
+   return (
+@@ -156,7 +137,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+                     required
+                     value={name}
+                     onChange={(e) => setName(e.target.value)}
+-                    placeholder="e.g. Priya Sharma"
++                    placeholder="Your full name"
+                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                   />
+                 </div>
+@@ -173,7 +154,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+                     required
+                     value={email}
+                     onChange={(e) => setEmail(e.target.value)}
+-                    placeholder="priya@samparkfoundation.org"
++                    placeholder="you@yourngo.org"
+                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                   />
+                 </div>
+@@ -190,7 +171,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+                     required
+                     value={organizationName}
+                     onChange={(e) => setOrganizationName(e.target.value)}
+-                    placeholder="Sampark Rural Development Foundation"
++                    placeholder="Your organisation name"
+                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                   />
+                 </div>
+@@ -242,7 +223,8 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+ 
+               <button
+                 type="submit"
+-                className="w-full mt-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
++                disabled={busy}
++                className="disabled:opacity-60 w-full mt-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+               >
+                 <UserPlus className="w-4 h-4" />
+                 Complete NGO Registration & Access
+@@ -261,7 +243,7 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+                     required
+                     value={email}
+                     onChange={(e) => setEmail(e.target.value)}
+-                    placeholder="e.g. priya.sharma@samparkfoundation.org"
++                    placeholder="you@yourngo.org"
+                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                   />
+                 </div>
+@@ -269,7 +251,8 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+ 
+               <button
+                 type="submit"
+-                className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
++                disabled={busy}
++                className="disabled:opacity-60 w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+               >
+                 <LogIn className="w-4 h-4" />
+                 Sign In to Knowledge Portal
+@@ -277,53 +260,6 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({ isOpen, onClose, o
+             </form>
+           )}
+ 
+-          {/* Quick Demo NGO Accounts */}
+-          <div className="mt-6 pt-4 border-t border-slate-100">
+-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+-              Instant Demo Access (1-Click Login)
+-            </span>
+-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+-              <button
+-                type="button"
+-                onClick={() =>
+-                  prefillDemoUser(
+-                    'priya.sharma@samparkfoundation.org',
+-                    'Priya Sharma',
+-                    'Sampark Rural Foundation',
+-                    'Executive Director',
+-                    'Education & Rural Development'
+-                  )
+-                }
+-                className="text-left p-2.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg transition-colors group"
+-              >
+-                <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-sky-800">
+-                  <span>Priya Sharma</span>
+-                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+-                </div>
+-                <div className="text-[11px] text-slate-500 truncate">Executive Director • Sampark NGO</div>
+-              </button>
+-
+-              <button
+-                type="button"
+-                onClick={() =>
+-                  prefillDemoUser(
+-                    'rajesh@aarogyatrust.org',
+-                    'Dr. Rajesh Kulkarni',
+-                    'Aarogya Public Health Trust',
+-                    'Program Manager',
+-                    'Healthcare'
+-                  )
+-                }
+-                className="text-left p-2.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg transition-colors group"
+-              >
+-                <div className="flex items-center justify-between text-xs font-semibold text-slate-800 group-hover:text-sky-800">
+-                  <span>Dr. Rajesh Kulkarni</span>
+-                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+-                </div>
+-                <div className="text-[11px] text-slate-500 truncate">Program Manager • Aarogya Health</div>
+-              </button>
+-            </div>
+-          </div>
+         </div>
+       </div>
+     </div>
+diff --git a/src/components/src/components/admin/AdminDashboard.tsx b/src/components/src/components/admin/AdminDashboard.tsx
+index c064fb9..51db0e9 100644
+--- a/src/components/src/components/admin/AdminDashboard.tsx
++++ b/src/components/src/components/admin/AdminDashboard.tsx
+@@ -1,4 +1,5 @@
+-import React from 'react';
++import React, { useEffect, useState } from 'react';
++import { fetchMembers } from '../../lib/members';
+ import { 
+   Eye, 
+   FileText, 
+@@ -33,6 +34,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+   onEditArticle,
+   onCreateNewArticle,
+ }) => {
++  // Member counts come from the server; re-render once they arrive.
++  const [, setMembersLoaded] = useState(0);
++  useEffect(() => {
++    fetchMembers().then((r) => { if (r.ok) setMembersLoaded((n) => n + 1); });
++  }, []);
+   const analytics = getAnalyticsData();
+   const maxDayViews = Math.max(...analytics.days.map(d => d.views), 10);
+   const openTicketsCount = tickets.filter(t => t.status === 'open').length;
+diff --git a/src/components/src/components/admin/ReportingAnalytics.tsx b/src/components/src/components/admin/ReportingAnalytics.tsx
+index 15e064c..e383597 100644
+--- a/src/components/src/components/admin/ReportingAnalytics.tsx
++++ b/src/components/src/components/admin/ReportingAnalytics.tsx
+@@ -1,4 +1,5 @@
+-import React from 'react';
++import React, { useEffect, useState } from 'react';
++import { fetchMembers } from '../../lib/members';
+ import { 
+   FileBarChart, 
+   Download, 
+@@ -19,6 +20,11 @@ import {
+ } from '../../lib/storage';
+ 
+ export const ReportingAnalytics: React.FC = () => {
++  // Member counts come from the server; re-render once they arrive.
++  const [, setMembersLoaded] = useState(0);
++  useEffect(() => {
++    fetchMembers().then((r) => { if (r.ok) setMembersLoaded((n) => n + 1); });
++  }, []);
+   const analytics = getAnalyticsData();
+ 
+   const handleDownloadReport = (type: 'users' | 'logins' | 'resources') => {
+diff --git a/src/components/src/components/admin/UserManager.tsx b/src/components/src/components/admin/UserManager.tsx
+index d1cbd5d..36175ec 100644
+--- a/src/components/src/components/admin/UserManager.tsx
++++ b/src/components/src/components/admin/UserManager.tsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useEffect, useState } from 'react';
+ import { 
+   Users, 
+   Search, 
+@@ -12,31 +12,79 @@ import {
+   CheckCircle, 
+   Ban,
+   FileSpreadsheet,
+-  Globe
++  Globe,
++  RefreshCw,
++  Trash2,
++  KeyRound
+ } from 'lucide-react';
+ import { User, LoginLog } from '../../types';
+ import { 
+-  getUsers, 
+-  getLoginLogs, 
+-  toggleUserStatus, 
+   exportUsersCSV, 
+   exportLoginLogsCSV 
+ } from '../../lib/storage';
++import { fetchMembers, getCachedMembers, setMemberStatus, deleteMember } from '../../lib/members';
++import { getAdminKey, setAdminKey } from '../../lib/tickets';
+ 
+ export const UserManager: React.FC = () => {
+-  const [users, setUsers] = useState<User[]>(getUsers());
+-  const [loginLogs] = useState<LoginLog[]>(getLoginLogs());
++  const [users, setUsers] = useState<User[]>(getCachedMembers().users);
++  const [loginLogs, setLoginLogs] = useState<LoginLog[]>(getCachedMembers().loginLogs);
+   const [searchTerm, setSearchTerm] = useState('');
+   const [sectorFilter, setSectorFilter] = useState('all');
+   const [selectedUser, setSelectedUser] = useState<User | null>(null);
++  const [loading, setLoading] = useState(false);
++  const [loadError, setLoadError] = useState<string | null>(null);
++  const [needsKey, setNeedsKey] = useState(!getAdminKey());
++  const [keyInput, setKeyInput] = useState('');
+ 
+-  const handleToggleStatus = (userId: string) => {
+-    toggleUserStatus(userId);
+-    setUsers(getUsers());
+-    if (selectedUser && selectedUser.id === userId) {
+-      const updated = getUsers().find(u => u.id === userId);
+-      if (updated) setSelectedUser(updated);
++  const load = async () => {
++    setLoading(true);
++    setLoadError(null);
++    const r = await fetchMembers();
++    setLoading(false);
++    if (!r.ok || !r.data) {
++      if (r.status === 401) setNeedsKey(true);
++      setLoadError(r.error || 'Could not load members.');
++      return;
+     }
++    setNeedsKey(false);
++    setUsers(r.data.users);
++    setLoginLogs(r.data.loginLogs);
++  };
++
++  useEffect(() => {
++    if (getAdminKey()) load();
++  }, []);
++
++  const handleSaveKey = (e: React.FormEvent) => {
++    e.preventDefault();
++    if (!keyInput.trim()) return;
++    setAdminKey(keyInput.trim());
++    setKeyInput('');
++    load();
++  };
++
++  const handleToggleStatus = async (userId: string) => {
++    const u = users.find(x => x.id === userId);
++    if (!u) return;
++    const next = u.status === 'active' ? 'suspended' : 'active';
++    const r = await setMemberStatus(userId, next);
++    if (!r.ok) {
++      setLoadError(r.error || 'Could not change status.');
++      return;
++    }
++    await load();
++    if (selectedUser && selectedUser.id === userId) setSelectedUser({ ...selectedUser, status: next });
++  };
++
++  const handleDelete = async (u: User) => {
++    if (!window.confirm(`Delete ${u.name} (${u.email}) and their login history? This cannot be undone.`)) return;
++    const r = await deleteMember(u.id);
++    if (!r.ok) {
++      setLoadError(r.error || 'Could not delete member.');
++      return;
++    }
++    if (selectedUser && selectedUser.id === u.id) setSelectedUser(null);
++    await load();
+   };
+ 
+   const filteredUsers = users.filter((u) => {
+@@ -96,6 +144,14 @@ export const UserManager: React.FC = () => {
+         </div>
+ 
+         <div className="flex flex-wrap items-center gap-2">
++          <button
++            onClick={load}
++            disabled={loading}
++            className="py-2 px-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-2 disabled:opacity-60"
++          >
++            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
++            Refresh
++          </button>
+           <button
+             onClick={handleDownloadUsersCSV}
+             className="py-2 px-3.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-2"
+@@ -113,6 +169,28 @@ export const UserManager: React.FC = () => {
+         </div>
+       </div>
+ 
++      {needsKey && (
++        <form onSubmit={handleSaveKey} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
++          <div className="flex items-center gap-2 text-sm text-amber-900 flex-1">
++            <KeyRound className="w-4 h-4" />
++            Member records are stored securely on the server. Enter the admin key (same as Support Tickets) to view them.
++          </div>
++          <input
++            type="password"
++            value={keyInput}
++            onChange={(e) => setKeyInput(e.target.value)}
++            placeholder="TICKETS_ADMIN_KEY"
++            className="px-3 py-2 text-sm border border-amber-300 rounded-lg bg-white"
++          />
++          <button type="submit" className="py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg">
++            Unlock
++          </button>
++        </form>
++      )}
++      {loadError && !needsKey && (
++        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-xl p-3">{loadError}</div>
++      )}
++
+       {/* Filters & Search Bar */}
+       <div className="flex flex-col sm:flex-row gap-3">
+         <div className="relative flex-1">
+@@ -161,7 +239,11 @@ export const UserManager: React.FC = () => {
+               {filteredUsers.length === 0 ? (
+                 <tr>
+                   <td colSpan={7} className="text-center py-12 text-slate-500 text-sm">
+-                    No NGO users found matching your search query.
++                    {loading
++                      ? 'Loading members…'
++                      : users.length === 0
++                        ? 'No members have registered yet.'
++                        : 'No NGO users found matching your search query.'}
+                   </td>
+                 </tr>
+               ) : (
+@@ -242,6 +324,14 @@ export const UserManager: React.FC = () => {
+                       >
+                         {u.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                       </button>
++
++                      <button
++                        onClick={() => handleDelete(u)}
++                        title="Delete member"
++                        className="p-1.5 rounded-lg transition-colors inline-flex items-center text-xs font-medium text-slate-500 hover:text-red-700 hover:bg-red-50"
++                      >
++                        <Trash2 className="w-4 h-4" />
++                      </button>
+                     </td>
+                   </tr>
+                 ))
+diff --git a/src/components/src/data/initialData.ts b/src/components/src/data/initialData.ts
+index 667458e..9c1d79c 100644
+--- a/src/components/src/data/initialData.ts
++++ b/src/components/src/data/initialData.ts
+@@ -26,60 +26,6 @@ export const INITIAL_SETTINGS: SiteSettings = {
+   logoUrl: "",
+ };
+ 
+-export const INITIAL_USERS: User[] = [
+-  {
+-    id: "usr-1001",
+-    name: "Priya Sharma",
+-    email: "priya.sharma@samparkfoundation.org",
+-    organizationName: "Sampark Rural Development Foundation",
+-    role: "Executive Director",
+-    sector: "Education & Rural Development",
+-    registeredAt: "2026-07-10T10:15:00Z",
+-    lastLoginAt: "2026-08-06T18:30:00Z",
+-    loginCount: 14,
+-    pageViewsCount: 42,
+-    downloadsCount: 8,
+-    savedResourceIds: ["res-107"],
+-    status: "active",
+-  },
+-  {
+-    id: "usr-1002",
+-    name: "Dr. Rajesh Kulkarni",
+-    email: "rajesh@aarogyatrust.org",
+-    organizationName: "Aarogya Public Health Trust",
+-    role: "Program Manager",
+-    sector: "Healthcare",
+-    registeredAt: "2026-07-18T14:20:00Z",
+-    lastLoginAt: "2026-08-05T11:45:00Z",
+-    loginCount: 9,
+-    pageViewsCount: 28,
+-    downloadsCount: 5,
+-    savedResourceIds: ["res-107"],
+-    status: "active",
+-  },
+-];
+-
+-export const INITIAL_LOGIN_LOGS: LoginLog[] = [
+-  {
+-    id: "log-501",
+-    userId: "usr-1001",
+-    userName: "Priya Sharma",
+-    userEmail: "priya.sharma@samparkfoundation.org",
+-    organizationName: "Sampark Rural Development Foundation",
+-    role: "Executive Director",
+-    timestamp: Date.now() - 3600000 * 4,
+-    date: new Date().toISOString().split('T')[0],
+-    device: "Chrome / macOS Desktop",
+-  },
+-  {
+-    id: "log-502",
+-    userId: "usr-1002",
+-    userName: "Dr. Rajesh Kulkarni",
+-    userEmail: "rajesh@aarogyatrust.org",
+-    organizationName: "Aarogya Public Health Trust",
+-    role: "Program Manager",
+-    timestamp: Date.now() - 3600000 * 8,
+-    date: new Date().toISOString().split('T')[0],
+-    device: "Safari / iPhone iOS",
+-  },
+-];
++// No demo accounts. Real members are stored on the server (/api/users).
++export const INITIAL_USERS: User[] = [];
++export const INITIAL_LOGIN_LOGS: LoginLog[] = [];
+diff --git a/src/components/src/lib/members.ts b/src/components/src/lib/members.ts
+new file mode 100644
+index 0000000..260b516
+--- /dev/null
++++ b/src/components/src/lib/members.ts
+@@ -0,0 +1,104 @@
++import { User, LoginLog } from '../types';
++import { getAdminKey } from './tickets';
++
++/**
++ * Talks to /api/users (Cloudflare D1).
++ *
++ * Visitors' browsers keep ONLY their own profile (ngo_current_user). The full
++ * member list and login history live on the server and are only returned to
++ * the admin portal, using the same admin key as the Support Tickets tab.
++ */
++
++const ENDPOINT = '/api/users';
++
++export interface ApiResult<T> {
++  ok: boolean;
++  data?: T;
++  error?: string;
++  status?: number;
++}
++
++function deviceLabel(): string {
++  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
++  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
++  const kind = /ipad|tablet/i.test(ua) ? 'Tablet' : /mobile/i.test(ua) ? 'Mobile' : 'Desktop';
++  return `${browser} / ${kind}`;
++}
++
++async function call<T>(method: string, body?: unknown, admin = false): Promise<ApiResult<T>> {
++  try {
++    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
++    if (admin) headers['x-admin-key'] = getAdminKey();
++    const response = await fetch(ENDPOINT, {
++      method,
++      headers,
++      body: body === undefined ? undefined : JSON.stringify(body),
++    });
++    const text = await response.text();
++    let parsed: any = {};
++    try {
++      parsed = JSON.parse(text);
++    } catch {
++      return { ok: false, status: response.status, error: 'Member accounts are not available on this server yet.' };
++    }
++    if (!response.ok) return { ok: false, status: response.status, error: parsed.error || 'Request failed.' };
++    return { ok: true, data: parsed as T };
++  } catch {
++    return { ok: false, error: 'Could not reach the server. Please check your connection and try again.' };
++  }
++}
++
++/* ------------------------------------------------------------------ member */
++
++export async function registerMember(details: {
++  name: string;
++  email: string;
++  organizationName: string;
++  role: string;
++  sector: string;
++}): Promise<ApiResult<User>> {
++  const r = await call<{ user: User }>('POST', { action: 'register', device: deviceLabel(), ...details });
++  return r.ok ? { ok: true, data: r.data!.user } : { ok: false, error: r.error, status: r.status };
++}
++
++export async function loginMember(email: string): Promise<ApiResult<User>> {
++  const r = await call<{ user: User }>('POST', { action: 'login', email, device: deviceLabel() });
++  return r.ok ? { ok: true, data: r.data!.user } : { ok: false, error: r.error, status: r.status };
++}
++
++/** Fire-and-forget activity counter for the signed-in member. */
++export function reportActivity(user: User, kind: 'view' | 'download' | 'bookmarks'): void {
++  void call('POST', {
++    action: 'activity',
++    id: user.id,
++    email: user.email,
++    kind,
++    savedResourceIds: kind === 'bookmarks' ? user.savedResourceIds : undefined,
++  });
++}
++
++/* ------------------------------------------------------------------- admin */
++
++let adminCache: { users: User[]; loginLogs: LoginLog[] } = { users: [], loginLogs: [] };
++
++/** Last list fetched by the admin portal (in memory only, never saved). */
++export function getCachedMembers() {
++  return adminCache;
++}
++
++export async function fetchMembers(): Promise<ApiResult<{ users: User[]; loginLogs: LoginLog[] }>> {
++  if (!getAdminKey()) {
++    return { ok: false, status: 401, error: 'Enter the admin key (same as Support Tickets) to load members.' };
++  }
++  const r = await call<{ users: User[]; loginLogs: LoginLog[] }>('GET', undefined, true);
++  if (r.ok && r.data) adminCache = { users: r.data.users || [], loginLogs: r.data.loginLogs || [] };
++  return r;
++}
++
++export async function setMemberStatus(id: string, status: 'active' | 'suspended'): Promise<ApiResult<unknown>> {
++  return call('PATCH', { id, status }, true);
++}
++
++export async function deleteMember(id: string): Promise<ApiResult<unknown>> {
++  return call('DELETE', { id }, true);
++}
+diff --git a/src/components/src/lib/storage.ts b/src/components/src/lib/storage.ts
+index 7d6fcaa..fcb43f9 100644
+--- a/src/components/src/lib/storage.ts
++++ b/src/components/src/lib/storage.ts
+@@ -12,10 +12,9 @@ import {
+ import { 
+   INITIAL_ARTICLES, 
+   INITIAL_CATEGORIES, 
+-  INITIAL_SETTINGS, 
+-  INITIAL_USERS, 
+-  INITIAL_LOGIN_LOGS 
++  INITIAL_SETTINGS 
+ } from '../data/initialData';
++import { getCachedMembers, reportActivity } from './members';
+ 
+ const KEYS = {
+   SETTINGS: 'ngo_settings',
+@@ -212,21 +211,31 @@ export function getArticleBySlug(slug: string): Article | undefined {
+ }
+ 
+ // --- Users & Login History Storage ---
+-export function getUsers(): User[] {
+-  try {
+-    const data = localStorage.getItem(KEYS.USERS);
+-    if (!data) {
+-      localStorage.setItem(KEYS.USERS, JSON.stringify(INITIAL_USERS));
+-      return INITIAL_USERS;
+-    }
+-    return JSON.parse(data);
+-  } catch {
+-    return INITIAL_USERS;
++//
++// Members are stored on the server (/api/users, Cloudflare D1). This browser
++// only keeps the profile of whoever is signed in HERE, so one member's details
++// are never visible to the next person using the same computer.
++//
++// getUsers()/getLoginLogs() return the list the admin portal last fetched
++// (in memory only). For public visitors they are always empty.
++
++// One-time clean-up: older builds seeded two demo accounts (Priya Sharma,
++// Dr. Rajesh Kulkarni) and kept every member who signed in on this browser.
++const DUMMY_USER_IDS = ['usr-1001', 'usr-1002'];
++try {
++  localStorage.removeItem(KEYS.USERS);
++  localStorage.removeItem(KEYS.LOGIN_LOGS);
++  const raw = localStorage.getItem(KEYS.CURRENT_USER);
++  if (raw) {
++    const cu = JSON.parse(raw);
++    if (!cu || DUMMY_USER_IDS.includes(cu.id)) localStorage.removeItem(KEYS.CURRENT_USER);
+   }
++} catch {
++  /* storage blocked - nothing to clean */
+ }
+ 
+-export function saveUsers(users: User[]): void {
+-  localStorage.setItem(KEYS.USERS, JSON.stringify(users));
++export function getUsers(): User[] {
++  return getCachedMembers().users;
+ }
+ 
+ export function getCurrentUser(): User | null {
+@@ -239,106 +248,24 @@ export function getCurrentUser(): User | null {
+ }
+ 
+ export function setCurrentUser(user: User | null): void {
+-  if (user) {
+-    localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
+-  } else {
+-    localStorage.removeItem(KEYS.CURRENT_USER);
+-  }
+-}
+-
+-export function registerUser(details: {
+-  name: string;
+-  email: string;
+-  organizationName: string;
+-  role: string;
+-  sector: string;
+-}): User {
+-  const users = getUsers();
+-  const normalizedEmail = details.email.trim().toLowerCase();
+-  
+-  let existingUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
+-
+-  if (existingUser) {
+-    // Update existing user details and record new login
+-    existingUser.name = details.name || existingUser.name;
+-    existingUser.organizationName = details.organizationName || existingUser.organizationName;
+-    existingUser.role = details.role || existingUser.role;
+-    existingUser.sector = details.sector || existingUser.sector;
+-    existingUser.lastLoginAt = new Date().toISOString();
+-    existingUser.loginCount = (existingUser.loginCount || 0) + 1;
+-    saveUsers(users);
+-    setCurrentUser(existingUser);
+-    recordLoginLog(existingUser);
+-    return existingUser;
+-  }
+-
+-  const newUser: User = {
+-    id: `usr-${Date.now().toString().slice(-6)}`,
+-    name: details.name.trim(),
+-    email: normalizedEmail,
+-    organizationName: details.organizationName.trim(),
+-    role: details.role.trim() || 'NGO Professional',
+-    sector: details.sector || 'All Sectors',
+-    registeredAt: new Date().toISOString(),
+-    lastLoginAt: new Date().toISOString(),
+-    loginCount: 1,
+-    pageViewsCount: 0,
+-    downloadsCount: 0,
+-    savedResourceIds: [],
+-    status: 'active',
+-  };
+-
+-  users.unshift(newUser);
+-  saveUsers(users);
+-  setCurrentUser(newUser);
+-  recordLoginLog(newUser);
+-  return newUser;
+-}
+-
+-export function loginUser(email: string): User | null {
+-  const users = getUsers();
+-  const normalizedEmail = email.trim().toLowerCase();
+-  const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+-
+-  if (!user) return null;
+-  if (user.status === 'suspended') {
+-    throw new Error('This user account has been suspended by the administrator.');
++  try {
++    if (user) {
++      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
++    } else {
++      localStorage.removeItem(KEYS.CURRENT_USER);
++    }
++  } catch {
++    /* private browsing */
+   }
+-
+-  user.lastLoginAt = new Date().toISOString();
+-  user.loginCount = (user.loginCount || 0) + 1;
+-  saveUsers(users);
+-  setCurrentUser(user);
+-  recordLoginLog(user);
+-  return user;
+ }
+ 
+ export function logoutUser(): void {
+   setCurrentUser(null);
+ }
+ 
+-export function toggleUserStatus(userId: string): void {
+-  const users = getUsers();
+-  const user = users.find(u => u.id === userId);
+-  if (user) {
+-    user.status = user.status === 'active' ? 'suspended' : 'active';
+-    saveUsers(users);
+-    
+-    // If current logged-in user is suspended, log them out
+-    const current = getCurrentUser();
+-    if (current && current.id === userId && user.status === 'suspended') {
+-      logoutUser();
+-    }
+-  }
+-}
+-
+ export function toggleBookmarkResource(resourceId: string): string[] {
+-  const current = getCurrentUser();
+-  if (!current) return [];
+-
+-  const users = getUsers();
+-  const user = users.find(u => u.id === current.id);
+-  const targetUser = user || current;
++  const targetUser = getCurrentUser();
++  if (!targetUser) return [];
+ 
+   if (!targetUser.savedResourceIds) {
+     targetUser.savedResourceIds = [];
+@@ -351,8 +278,8 @@ export function toggleBookmarkResource(resourceId: string): string[] {
+     targetUser.savedResourceIds.push(resourceId);
+   }
+ 
+-  saveUsers(users);
+   setCurrentUser(targetUser);
++  reportActivity(targetUser, 'bookmarks');
+ 
+   // Also update article bookmark count
+   const articles = getArticles();
+@@ -367,48 +294,9 @@ export function toggleBookmarkResource(resourceId: string): string[] {
+ }
+ 
+ // --- Login Activity Logs ---
++// Recorded on the server when a member registers or signs in.
+ export function getLoginLogs(): LoginLog[] {
+-  try {
+-    const data = localStorage.getItem(KEYS.LOGIN_LOGS);
+-    if (!data) {
+-      localStorage.setItem(KEYS.LOGIN_LOGS, JSON.stringify(INITIAL_LOGIN_LOGS));
+-      return INITIAL_LOGIN_LOGS;
+-    }
+-    return JSON.parse(data);
+-  } catch {
+-    return INITIAL_LOGIN_LOGS;
+-  }
+-}
+-
+-export function recordLoginLog(user: User): void {
+-  try {
+-    const logs = getLoginLogs();
+-    const today = new Date().toISOString().split('T')[0];
+-    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
+-    
+-    let deviceType = 'Desktop';
+-    if (/mobile/i.test(userAgent)) deviceType = 'Mobile Browser';
+-    else if (/tablet|ipad/i.test(userAgent)) deviceType = 'Tablet';
+-
+-    const newLog: LoginLog = {
+-      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+-      userId: user.id,
+-      userName: user.name,
+-      userEmail: user.email,
+-      organizationName: user.organizationName,
+-      role: user.role,
+-      timestamp: Date.now(),
+-      date: today,
+-      device: deviceType,
+-    };
+-
+-    logs.unshift(newLog);
+-    // Keep last 1000 logs
+-    if (logs.length > 1000) logs.splice(1000);
+-    localStorage.setItem(KEYS.LOGIN_LOGS, JSON.stringify(logs));
+-  } catch (e) {
+-    console.error('Failed to log user login activity:', e);
+-  }
++  return getCachedMembers().loginLogs;
+ }
+ 
+ // --- Article View & Download Tracking ---
+@@ -423,13 +311,9 @@ export function incrementArticleView(articleId: string, language: Language = 'en
+   // Also increment logged-in user page views count if logged in
+   const currentUser = getCurrentUser();
+   if (currentUser) {
+-    const users = getUsers();
+-    const user = users.find(u => u.id === currentUser.id);
+-    if (user) {
+-      user.pageViewsCount = (user.pageViewsCount || 0) + 1;
+-      saveUsers(users);
+-      setCurrentUser(user);
+-    }
++    currentUser.pageViewsCount = (currentUser.pageViewsCount || 0) + 1;
++    setCurrentUser(currentUser);
++    reportActivity(currentUser, 'view');
+   }
+ 
+   // Page view log
+@@ -464,13 +348,9 @@ export function incrementResourceDownload(articleId: string): void {
+ 
+   const currentUser = getCurrentUser();
+   if (currentUser) {
+-    const users = getUsers();
+-    const user = users.find(u => u.id === currentUser.id);
+-    if (user) {
+-      user.downloadsCount = (user.downloadsCount || 0) + 1;
+-      saveUsers(users);
+-      setCurrentUser(user);
+-    }
++    currentUser.downloadsCount = (currentUser.downloadsCount || 0) + 1;
++    setCurrentUser(currentUser);
++    reportActivity(currentUser, 'download');
+   }
+ 
+   // Record Download Log
+@@ -674,8 +554,6 @@ export function resetToDefaults(): void {
+   localStorage.setItem(KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
+   localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
+   localStorage.setItem(KEYS.ARTICLES, JSON.stringify(INITIAL_ARTICLES));
+-  localStorage.setItem(KEYS.USERS, JSON.stringify(INITIAL_USERS));
+-  localStorage.setItem(KEYS.LOGIN_LOGS, JSON.stringify(INITIAL_LOGIN_LOGS));
+   localStorage.removeItem(KEYS.CURRENT_USER);
+   localStorage.removeItem(KEYS.DOWNLOAD_LOGS);
+   localStorage.removeItem(KEYS.PAGE_VIEWS);
