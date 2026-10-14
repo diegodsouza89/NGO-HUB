@@ -150,7 +150,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                 >
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
-                  <CategoryArt title="Posters, SOPs & Policy Templates" art="posters" />
+                  <CategoryArt title="Posters & Policy Templates" art="posters" />
 
                   <div>
                     <div className="flex items-center justify-between mb-4">
@@ -166,16 +166,16 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                     </div>
 
                     <h3 className="text-lg font-bold text-slate-900 group-hover:text-sky-900 transition-colors mb-2">
-                      Posters, SOPs &amp; Policy Templates
+                      Posters &amp; Policy Templates
                     </h3>
 
                     <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-2">
-                      Ready-made posters, SOPs and policy templates you can download and adapt for your organisation.
+                      Ready-made posters and policy templates you can download and adapt for your organisation.
                     </p>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-sky-700 group-hover:text-sky-800">
-                    <span>Browse posters, SOPs &amp; policies</span>
+                    <span>Browse posters &amp; policies</span>
                     <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>

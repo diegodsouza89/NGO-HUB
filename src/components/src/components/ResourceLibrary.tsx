@@ -90,7 +90,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
           <span>Knowledge Hub Home</span>
         </button>
         <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-        <span className="text-sky-900 font-bold">Posters, SOPs &amp; Policy Templates</span>
+        <span className="text-sky-900 font-bold">Posters &amp; Policy Templates</span>
       </div>
 
       <div className="bg-gradient-to-r from-sky-50 via-blue-50/60 to-sky-100/50 border border-sky-200/80 rounded-3xl p-6 sm:p-10 mb-8 shadow-xs">
@@ -98,9 +98,9 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
           <LayoutTemplate className="w-3.5 h-3.5 text-sky-700" />
           <span>Free to download and use</span>
         </div>
-        <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mb-3 leading-tight">Posters, SOPs &amp; Policy Templates</h1>
+        <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mb-3 leading-tight">Posters &amp; Policy Templates</h1>
         <p className="text-slate-600 text-sm sm:text-base max-w-2xl leading-relaxed">
-          Ready-made posters, SOPs, policy and document templates for your organisation. Download, adapt and use them in your work.
+          Ready-made posters, policy and document templates for your organisation. Download, adapt and use them in your work.
         </p>
       </div>
 
@@ -126,7 +126,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search posters, SOPs & policies"
+            placeholder="Search posters & policies"
             className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-sky-600"
           />
         </label>
@@ -163,7 +163,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
                 <div className="p-4 flex-1 flex flex-col">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-900">
-                      {KIND_LABELS[r.kind]}
+                      {KIND_LABELS[r.kind] || 'Other'}
                     </span>
                     {catName(r.categoryId) && (
                       <span className="text-[11px] text-slate-500 truncate">{catName(r.categoryId)}</span>
