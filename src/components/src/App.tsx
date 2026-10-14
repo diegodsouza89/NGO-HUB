@@ -12,6 +12,7 @@ import { UserDashboardModal } from './components/UserDashboardModal';
 import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { Footer } from './components/Footer';
+import { ResourceLibrary } from './components/ResourceLibrary';
 
 import { Category, Article, SiteSettings, Language, User as UserType } from './types';
 import { 
@@ -26,6 +27,7 @@ import { syncPublishedContent } from './lib/syncRepoContent';
 
 export default function App() {
   const isAdminRoute = (path: string) => path === '/admin' || path === '/staff';
+  const RESOURCES_PATH = '/resources';
 
   // Core Data States
   const [categories, setCategories] = useState<Category[]>([]);
@@ -35,13 +37,14 @@ export default function App() {
 
   // UI Navigation States
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
-  const getInitialView = (): 'home' | 'category' | 'article' | 'assessment' | 'admin_login' | 'admin_panel' => {
+  const getInitialView = (): 'home' | 'category' | 'article' | 'assessment' | 'resources' | 'admin_login' | 'admin_panel' => {
     if (typeof window !== 'undefined' && isAdminRoute(window.location.pathname)) {
       return isAdminAuthenticated() ? 'admin_panel' : 'admin_login';
     }
+    if (typeof window !== 'undefined' && window.location.pathname === RESOURCES_PATH) return 'resources';
     return 'home';
   };
-  const [currentView, setCurrentView] = useState<'home' | 'category' | 'article' | 'assessment' | 'admin_login' | 'admin_panel'>(getInitialView);
+  const [currentView, setCurrentView] = useState<'home' | 'category' | 'article' | 'assessment' | 'resources' | 'admin_login' | 'admin_panel'>(getInitialView);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedResourceType, setSelectedResourceType] = useState<string>('all');
@@ -81,6 +84,8 @@ export default function App() {
       const path = window.location.pathname;
       if (isAdminRoute(path)) {
         setCurrentView(isAdminAuthenticated() ? 'admin_panel' : 'admin_login');
+      } else if (path === RESOURCES_PATH) {
+        setCurrentView('resources');
       } else {
         setCurrentView('home');
       }
@@ -94,6 +99,12 @@ export default function App() {
   const handleOpenAdmin = () => {
     window.history.pushState({}, '', '/staff');
     setCurrentView(isAdminAuthenticated() ? 'admin_panel' : 'admin_login');
+  };
+
+  const handleOpenResources = () => {
+    window.history.pushState({}, '', RESOURCES_PATH);
+    setCurrentView('resources');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSelectCategory = (cat: Category) => {
@@ -171,6 +182,7 @@ export default function App() {
               onOpenSearch={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               onOpenUserAuth={() => setIsUserAuthOpen(true)}
               onOpenUserDashboard={() => setIsUserDashboardOpen(true)}
+              onOpenResources={handleOpenResources}
               currentUser={currentUser}
               settings={settings}
               isAdmin={isAdminAuthenticated()}
@@ -213,6 +225,10 @@ export default function App() {
                   onSelectArticle={handleSelectArticle}
                   onBackToHome={handleNavigateHome}
                 />
+              )}
+
+              {currentView === 'resources' && (
+                <ResourceLibrary categories={categories} onBackToHome={handleNavigateHome} />
               )}
 
               {currentView === 'assessment' && (
