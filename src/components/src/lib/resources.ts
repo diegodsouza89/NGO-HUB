@@ -12,11 +12,10 @@ const ENDPOINT = '/api/resources';
 const PIECE_BYTES = 512 * 1024;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-export type ResourceKind = 'poster' | 'sop' | 'policy' | 'template' | 'other';
+export type ResourceKind = 'poster' | 'policy' | 'template' | 'other';
 
 export const KIND_LABELS: Record<ResourceKind, string> = {
   poster: 'Poster',
-  sop: 'SOP template',
   policy: 'Policy template',
   template: 'Document template',
   other: 'Other',
@@ -25,13 +24,12 @@ export const KIND_LABELS: Record<ResourceKind, string> = {
 /** Filter-tab label for a kind. */
 export const KIND_PLURALS: Record<ResourceKind, string> = {
   poster: 'Posters',
-  sop: 'SOP templates',
   policy: 'Policy templates',
   template: 'Document templates',
   other: 'Other',
 };
 
-export const KIND_ORDER: ResourceKind[] = ['poster', 'sop', 'policy', 'template', 'other'];
+export const KIND_ORDER: ResourceKind[] = ['poster', 'policy', 'template', 'other'];
 
 export interface HubResource {
   id: string;
