@@ -5,6 +5,7 @@ import {
   LayoutTemplate
 } from 'lucide-react';
 import { fetchResources } from '../lib/resources';
+import { resourceText } from '../lib/resourceText';
 import { Article, Category, Language } from '../types';
 import { CategoryIcon } from '../lib/categoryIcons';
 import CategoryArt from './CategoryArt';
@@ -166,16 +167,16 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                     </div>
 
                     <h3 className="text-lg font-bold text-slate-900 group-hover:text-sky-900 transition-colors mb-2">
-                      Posters &amp; Policy Templates
+                      {resourceText(currentLanguage).title}
                     </h3>
 
                     <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-2">
-                      Ready-made posters and policy templates you can download and adapt for your organisation.
+                      {resourceText(currentLanguage).cardDesc}
                     </p>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-sky-700 group-hover:text-sky-800">
-                    <span>Browse posters &amp; policies</span>
+                    <span>{resourceText(currentLanguage).browse}</span>
                     <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>

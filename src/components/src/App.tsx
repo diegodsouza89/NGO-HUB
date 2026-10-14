@@ -228,7 +228,7 @@ export default function App() {
               )}
 
               {currentView === 'resources' && (
-                <ResourceLibrary categories={categories} onBackToHome={handleNavigateHome} />
+                <ResourceLibrary categories={categories} currentLanguage={currentLanguage} onBackToHome={handleNavigateHome} />
               )}
 
               {currentView === 'assessment' && (

@@ -15,7 +15,7 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
   { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', flag: '🇮🇳' },
   { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇮🇳' },
   { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', flag: '🇮🇳' },
-  { code: 'kn', name: 'Kannada', nativeName: 'కన్నడ', flag: '🇮🇳' },
+  { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', flag: '🇮🇳' },
 ];
 
 export type ResourceType = 'article' | 'case_study' | 'best_practice' | 'toolkit' | 'guide' | 'policy';

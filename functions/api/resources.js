@@ -19,7 +19,11 @@
  *   PUT    {action:'chunk', uploadId, index, data}
  *   PUT    {action:'finalize', uploadId, title, description, kind, categoryId,
  *           fileName, mime, size, chunkCount, thumbnail, published}
- *   PUT    {action:'update', id, title?, description?, kind?, categoryId?, published?}
+ *   PUT    {action:'update', id, title?, description?, kind?, categoryId?, language?, published?}
+ *
+ * Every item carries an optional `language` (en, hi, mr, ta, te, bn, gu, kn).
+ * The column is added automatically the first time this function runs, so
+ * no manual D1 migration is needed.
  *   DELETE /api/resources?id=X
  *
  * Uploads use PUT on purpose: functions/_middleware.js caps POST bodies at
@@ -27,6 +31,28 @@
  */
 
 const KINDS = ['poster', 'policy', 'template', 'other'];
+const LANGUAGES = ['en', 'hi', 'mr', 'ta', 'te', 'bn', 'gu', 'kn'];
+
+function langOrNull(v) {
+  return LANGUAGES.includes(v) ? v : null;
+}
+
+// Adds resources.language on databases created before it existed. Runs once
+// per worker instance; "duplicate column" means it is already there.
+let languageColumnReady = false;
+async function ensureLanguageColumn(db) {
+  if (languageColumnReady) return;
+  try {
+    await db.prepare('ALTER TABLE resources ADD COLUMN language TEXT').run();
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    if (!/duplicate column/i.test(msg)) {
+      if (/no such table/i.test(msg)) return; // schema not created yet; reported below
+      throw e;
+    }
+  }
+  languageColumnReady = true;
+}
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_CHUNK_CHARS = 1024 * 1024;          // base64 of a 512 KB piece is ~700 KB
 const MAX_CHUNKS = 80;
@@ -91,6 +117,7 @@ function rowToItem(r) {
     description: r.description,
     kind: r.kind,
     categoryId: r.category_id || undefined,
+    language: r.language || undefined,
     fileName: r.file_name,
     mime: r.mime,
     size: r.size,
@@ -131,6 +158,8 @@ export async function onRequest(context) {
   const admin = isAdmin(request, env);
 
   try {
+    await ensureLanguageColumn(db);
+
     /* -------------------------------------------------------------- GET */
     if (request.method === 'GET') {
       const id = url.searchParams.get('id');
@@ -230,6 +259,7 @@ export async function onRequest(context) {
         const description = clean(body.description, 1000);
         const kind = KINDS.includes(body.kind) ? body.kind : 'template';
         const categoryId = clean(body.categoryId, 200) || null;
+        const language = langOrNull(body.language);
         const fileName = clean(body.fileName, 200).replace(/[\\/"<>]/g, '_');
         const mime = str(body.mime);
         const size = Number(body.size);
@@ -261,11 +291,11 @@ export async function onRequest(context) {
         await db
           .prepare(
             `INSERT INTO resources
-               (id, title, description, kind, category_id, file_name, mime, size, chunk_count,
+               (id, title, description, kind, category_id, language, file_name, mime, size, chunk_count,
                 thumbnail, published, download_count, sort_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`
           )
-          .bind(uploadId, title, description, kind, categoryId, fileName, mime, size, chunkCount,
+          .bind(uploadId, title, description, kind, categoryId, language, fileName, mime, size, chunkCount,
                 thumbnail || null, published, now, now)
           .run();
 
@@ -298,6 +328,7 @@ export async function onRequest(context) {
           sets.push('kind = ?'); vals.push(body.kind);
         }
         if (body.categoryId !== undefined) { sets.push('category_id = ?'); vals.push(clean(body.categoryId, 200) || null); }
+        if (body.language !== undefined) { sets.push('language = ?'); vals.push(langOrNull(body.language)); }
         if (body.published !== undefined) { sets.push('published = ?'); vals.push(body.published ? 1 : 0); }
         if (!sets.length) return json({ error: 'Nothing to change.' }, 400);
         sets.push('updated_at = ?'); vals.push(now);

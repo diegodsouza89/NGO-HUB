@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS resources (
   description    TEXT    NOT NULL DEFAULT '',
   kind           TEXT    NOT NULL DEFAULT 'template',   -- 'poster' | 'policy' | 'template' | 'other'
   category_id    TEXT,                                  -- optional link to a site category
+  language       TEXT,                                  -- 'en' | 'hi' | 'mr' | 'ta' | 'te' | 'bn' | 'gu' | 'kn'
   file_name      TEXT    NOT NULL,
   mime           TEXT    NOT NULL,
   size           INTEGER NOT NULL,
@@ -41,3 +42,7 @@ CREATE TABLE IF NOT EXISTS resource_chunks (
 -- Check it worked:
 --   SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'resource%';
 -- Should list resource_chunks and resources.
+
+-- Databases created before the language column existed get it automatically
+-- from functions/api/resources.js on first request. To add it by hand instead:
+--   ALTER TABLE resources ADD COLUMN language TEXT;

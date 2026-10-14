@@ -1,4 +1,5 @@
 import { getPublishKey } from './publishContent';
+import { Language, SUPPORTED_LANGUAGES } from '../types';
 
 /**
  * Posters and document templates, stored in D1 through /api/resources.
@@ -31,12 +32,43 @@ export const KIND_PLURALS: Record<ResourceKind, string> = {
 
 export const KIND_ORDER: ResourceKind[] = ['poster', 'policy', 'template', 'other'];
 
+const LANG_CODES = SUPPORTED_LANGUAGES.map((l) => l.code);
+
+export function isLanguage(v: unknown): v is Language {
+  return typeof v === 'string' && (LANG_CODES as string[]).includes(v);
+}
+
+/**
+ * Best guess at a file's language from its title or file name, for rows saved
+ * before the language field existed ("Poster 2 (Hindi)" -> 'hi').
+ */
+export function guessLanguage(text: string): Language | undefined {
+  const t = text.toLowerCase();
+  for (const l of SUPPORTED_LANGUAGES) {
+    if (l.code === 'en') continue;
+    if (t.includes(l.name.toLowerCase()) || text.includes(l.nativeName)) return l.code;
+  }
+  if (/english/.test(t)) return 'en';
+  return undefined;
+}
+
+/** The language a resource is in: the saved value, else a guess, else English. */
+export function resourceLanguage(r: Pick<HubResource, 'language' | 'title' | 'fileName'>): Language {
+  return r.language || guessLanguage(r.title) || guessLanguage(r.fileName) || 'en';
+}
+
+export function languageName(code: Language): string {
+  return SUPPORTED_LANGUAGES.find((l) => l.code === code)?.nativeName || code;
+}
+
 export interface HubResource {
   id: string;
   title: string;
   description: string;
   kind: ResourceKind;
   categoryId?: string;
+  /** Language the poster / template is written in. Older rows may lack it. */
+  language?: Language;
   fileName: string;
   mime: string;
   size: number;
@@ -191,6 +223,7 @@ export interface UploadInput {
   description: string;
   kind: ResourceKind;
   categoryId?: string;
+  language?: Language;
   published: boolean;
 }
 
@@ -236,6 +269,7 @@ export async function uploadResource(
       description: input.description,
       kind: input.kind,
       categoryId: input.categoryId || '',
+      language: input.language || '',
       fileName: file.name,
       mime: mimeFor(file),
       size: file.size,
@@ -252,7 +286,7 @@ export async function uploadResource(
 
 export async function updateResource(
   id: string,
-  changes: Partial<Pick<HubResource, 'title' | 'description' | 'kind' | 'categoryId' | 'published'>>
+  changes: Partial<Pick<HubResource, 'title' | 'description' | 'kind' | 'categoryId' | 'language' | 'published'>>
 ): Promise<HubResource> {
   const res = await fetch(ENDPOINT, {
     method: 'PUT',
@@ -292,7 +326,7 @@ export async function fetchResourceBlob(
   return new Blob(parts as BlobPart[], { type: r.mime });
 }
 
-function saveBlob(blob: Blob, fileName: string) {
+export function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -309,13 +343,27 @@ export async function downloadResource(
 ): Promise<void> {
   const blob = await fetchResourceBlob(r, !!opts.asAdmin, opts.onProgress);
   saveBlob(blob, r.fileName);
-  if (!opts.asAdmin) {
-    fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'download', id: r.id }),
-    }).catch(() => {
-      /* a missed count is not worth bothering the visitor about */
-    });
-  }
+  if (!opts.asAdmin) countDownload(r.id);
+}
+
+/** Records a public download (used when the file was already fetched for a preview). */
+export function countDownload(id: string): void {
+  fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'download', id }),
+  }).catch(() => {
+    /* a missed count is not worth bothering the visitor about */
+  });
+}
+
+/** How a file can be shown in the in-page viewer. */
+export type PreviewMode = 'image' | 'pdf' | 'docx' | 'text' | 'none';
+
+export function previewMode(r: Pick<HubResource, 'mime' | 'fileName'>): PreviewMode {
+  if (/^image\/(png|jpeg|webp)$/.test(r.mime)) return 'image';
+  if (r.mime === 'application/pdf') return 'pdf';
+  if (r.mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx';
+  if (r.mime === 'text/plain' || r.mime === 'text/csv') return 'text';
+  return 'none';
 }

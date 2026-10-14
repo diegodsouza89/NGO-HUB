@@ -15,7 +15,7 @@ import {
   Pencil,
   X,
 } from 'lucide-react';
-import { Category } from '../../types';
+import { Category, Language, SUPPORTED_LANGUAGES } from '../../types';
 import { getPublishKey, setPublishKey } from '../../lib/publishContent';
 import {
   ACCEPT_ATTR,
@@ -30,7 +30,10 @@ import {
   fetchResources,
   fileLabel,
   formatSize,
+  guessLanguage,
   isAllowedFile,
+  languageName,
+  resourceLanguage,
   updateResource,
   uploadResource,
 } from '../../lib/resources';
@@ -70,6 +73,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
   const [description, setDescription] = useState('');
   const [kind, setKind] = useState<ResourceKind>('poster');
   const [categoryId, setCategoryId] = useState('');
+  const [language, setLanguage] = useState<Language>('en');
   const [publishNow, setPublishNow] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -119,6 +123,8 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     }
     setFile(f);
     if (!title.trim()) setTitle(titleFromFileName(f.name));
+    const guessed = guessLanguage(f.name);
+    if (guessed) setLanguage(guessed);
     if (/\.(png|jpe?g|webp)$/i.test(f.name)) setKind('poster');
     else if (/polic/i.test(f.name)) setKind('policy');
     else if (/\.(docx?|xlsx?|pptx?|odt|csv|txt)$/i.test(f.name)) setKind('template');
@@ -129,6 +135,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     setTitle('');
     setDescription('');
     setCategoryId('');
+    setLanguage('en');
     setPublishNow(true);
     setProgress(0);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -154,7 +161,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     setProgress(0);
     try {
       const item = await uploadResource(
-        { file, title: title.trim(), description: description.trim(), kind, categoryId, published: publishNow },
+        { file, title: title.trim(), description: description.trim(), kind, categoryId, language, published: publishNow },
         setProgress
       );
       setItems((prev) => [item, ...prev]);
@@ -218,6 +225,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
         description: editing.description,
         kind: editing.kind,
         categoryId: editing.categoryId || '',
+        language: resourceLanguage(editing),
       });
       setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       setEditing(null);
@@ -382,6 +390,16 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
               ))}
             </select>
           </label>
+          <label className="block">
+            <span className="block text-xs font-semibold text-stone-700 mb-1">Language of the file</span>
+            <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} className={inputCls}>
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name}{l.nativeName !== l.name ? ' — ' + l.nativeName : ''}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-2 sm:mt-6 text-sm text-stone-700 cursor-pointer">
             <input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} />
             Publish straight away
@@ -495,6 +513,13 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
                         </option>
                       ))}
                     </select>
+                    <select value={resourceLanguage(editing)} onChange={(e) => setEditing({ ...editing, language: e.target.value as Language })} className={inputCls}>
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name}{l.nativeName !== l.name ? ' — ' + l.nativeName : ''}
+                </option>
+              ))}
+            </select>
                     <div className="flex gap-2">
                       <button
                         onClick={saveEdit}
@@ -517,6 +542,13 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
                       <span className="font-semibold text-stone-900 truncate">{r.title}</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
                         {KIND_LABELS[r.kind] || 'Other'}
+                      </span>
+                      <span
+                        title={r.language ? 'Language' : 'Language guessed from the title — edit to confirm'}
+                        className="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      >
+                        {languageName(resourceLanguage(r))}
+                        {!r.language && ' ?'}
                       </span>
                       {!r.published && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-700">
