@@ -10,7 +10,8 @@ import {
   User,
   Bookmark,
   LogIn,
-  BookOpen
+  BookOpen,
+  LayoutTemplate
 } from 'lucide-react';
 import { Language, SUPPORTED_LANGUAGES, SiteSettings, User as UserType } from '../types';
 
@@ -21,6 +22,7 @@ interface NavbarProps {
   onOpenSearch: () => void;
   onOpenUserAuth: () => void;
   onOpenUserDashboard: () => void;
+  onOpenResources: () => void;
   currentUser: UserType | null;
   settings: SiteSettings;
   isAdmin: boolean;
@@ -33,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSearch,
   onOpenUserAuth,
   onOpenUserDashboard,
+  onOpenResources,
   currentUser,
   settings,
   isAdmin,
@@ -83,6 +86,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Desktop Navigation Controls */}
           <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={onOpenResources}
+              className="flex items-center gap-1.5 bg-white hover:bg-sky-50 border border-sky-200 text-sky-900 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+            >
+              <LayoutTemplate className="w-4 h-4 text-sky-700" />
+              <span>Posters &amp; Templates</span>
+            </button>
+
             {/* User Member Portal Account Button */}
             {currentUser ? (
               <button
@@ -178,6 +189,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Search className="w-4 h-4 text-slate-500" />
             <span>Search Articles & Toolkits</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onOpenResources();
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-sky-900 bg-sky-50 rounded-lg text-sm font-medium"
+          >
+            <LayoutTemplate className="w-4 h-4 text-sky-700" />
+            <span>Posters &amp; Templates</span>
           </button>
 
           {currentUser ? (
