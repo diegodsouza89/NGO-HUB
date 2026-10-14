@@ -26,7 +26,7 @@
  * 128 KB, and one piece is larger than that.
  */
 
-const KINDS = ['poster', 'sop', 'policy', 'template', 'other'];
+const KINDS = ['poster', 'policy', 'template', 'other'];
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_CHUNK_CHARS = 1024 * 1024;          // base64 of a 512 KB piece is ~700 KB
 const MAX_CHUNKS = 80;
