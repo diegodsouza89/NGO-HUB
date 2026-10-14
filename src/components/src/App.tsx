@@ -182,7 +182,6 @@ export default function App() {
               onOpenSearch={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               onOpenUserAuth={() => setIsUserAuthOpen(true)}
               onOpenUserDashboard={() => setIsUserDashboardOpen(true)}
-              onOpenResources={handleOpenResources}
               currentUser={currentUser}
               settings={settings}
               isAdmin={isAdminAuthenticated()}
@@ -213,6 +212,7 @@ export default function App() {
                     onSelectCategory={handleSelectCategory}
                     onSelectArticle={handleSelectArticle}
                     selectedResourceType={selectedResourceType}
+                    onOpenResources={handleOpenResources}
                   />
                 </>
               )}
