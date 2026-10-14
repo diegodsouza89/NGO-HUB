@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
-  BookOpen
+  BookOpen,
+  LayoutTemplate
 } from 'lucide-react';
+import { fetchResources } from '../lib/resources';
 import { Article, Category, Language } from '../types';
 import { CategoryIcon } from '../lib/categoryIcons';
 import CategoryArt from './CategoryArt';
@@ -14,6 +16,7 @@ interface CategoryListProps {
   onSelectCategory: (category: Category) => void;
   onSelectArticle: (article: Article) => void;
   selectedResourceType: string;
+  onOpenResources?: () => void;
 }
 
 export const CategoryList: React.FC<CategoryListProps> = ({
@@ -23,9 +26,22 @@ export const CategoryList: React.FC<CategoryListProps> = ({
   onSelectCategory,
   onSelectArticle,
   selectedResourceType,
+  onOpenResources,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'knowledge-hub' | 'articles'>('knowledge-hub');
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
+  // How many posters and templates are live, for the tile's count badge.
+  const [resourceCount, setResourceCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!onOpenResources) return;
+    let alive = true;
+    fetchResources(false).then((r) => {
+      if (alive && r.available) setResourceCount(r.items.length);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [onOpenResources]);
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -118,6 +134,52 @@ export const CategoryList: React.FC<CategoryListProps> = ({
                   </div>
                 );
               })}
+
+              {onOpenResources && (
+                <div
+                  onClick={onOpenResources}
+                  role="link"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpenResources();
+                    }
+                  }}
+                  className="group bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:border-sky-500 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden"
+                >
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                  <CategoryArt title="Posters & Templates" art="posters" />
+
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 group-hover:bg-sky-50 flex items-center justify-center transition-colors">
+                        <LayoutTemplate className="w-6 h-6 text-sky-700" />
+                      </div>
+                      {resourceCount !== null && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 group-hover:bg-sky-100 group-hover:text-sky-950 transition-colors">
+                          <LayoutTemplate className="w-3 h-3 text-sky-700" />
+                          {resourceCount}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-sky-900 transition-colors mb-2">
+                      Posters &amp; Templates
+                    </h3>
+
+                    <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-2">
+                      Ready-made posters and document templates you can download and use in your organisation.
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-sky-700 group-hover:text-sky-800">
+                    <span>Browse Posters &amp; Templates</span>
+                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
