@@ -120,7 +120,6 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     setFile(f);
     if (!title.trim()) setTitle(titleFromFileName(f.name));
     if (/\.(png|jpe?g|webp)$/i.test(f.name)) setKind('poster');
-    else if (/\bsop\b|procedure/i.test(f.name)) setKind('sop');
     else if (/polic/i.test(f.name)) setKind('policy');
     else if (/\.(docx?|xlsx?|pptx?|odt|csv|txt)$/i.test(f.name)) setKind('template');
   };
@@ -160,7 +159,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
       );
       setItems((prev) => [item, ...prev]);
       setNotice(
-        '“' + item.title + '” uploaded' + (item.published ? ' and is live on the Posters, SOPs & Policy Templates page.' : ' as a draft.')
+        '“' + item.title + '” uploaded' + (item.published ? ' and is live on the Posters & Policy Templates page.' : ' as a draft.')
       );
       resetForm();
     } catch (err) {
@@ -245,10 +244,10 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-stone-900">Posters, SOPs &amp; Policy Templates</h2>
+          <h2 className="text-xl font-bold text-stone-900">Posters &amp; Policy Templates</h2>
           <p className="text-sm text-stone-600 mt-1">
-            Upload posters, SOPs, policies and document templates. Published files appear on the public{' '}
-            <span className="font-semibold">Posters, SOPs &amp; Policy Templates</span> page for anyone to download.
+            Upload posters, policies and document templates. Published files appear on the public{' '}
+            <span className="font-semibold">Posters &amp; Policy Templates</span> page for anyone to download.
           </p>
         </div>
         <button
@@ -517,7 +516,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-stone-900 truncate">{r.title}</span>
                       <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
-                        {KIND_LABELS[r.kind]}
+                        {KIND_LABELS[r.kind] || 'Other'}
                       </span>
                       {!r.published && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-700">

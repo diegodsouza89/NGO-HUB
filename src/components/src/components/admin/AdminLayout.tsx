@@ -162,7 +162,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               }`}
             >
               <LayoutTemplate className="w-4 h-4" />
-              <span>Posters, SOPs & Policies</span>
+              <span>Posters & Policies</span>
             </button>
 
             <button
