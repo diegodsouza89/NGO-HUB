@@ -10,7 +10,8 @@ import {
   LogOut, 
   ArrowLeft, 
   Building2, 
-  ShieldCheck 
+  ShieldCheck,
+  LayoutTemplate
 } from 'lucide-react';
 import { Article, Category, SiteSettings } from '../../types';
 import { AdminDashboard } from './AdminDashboard';
@@ -23,11 +24,12 @@ import { SettingsManager } from './SettingsManager';
 // nothing.
 import { UserManager } from './UserManager';
 import { ReportingAnalytics } from './ReportingAnalytics';
+import { ResourceManager } from './ResourceManager';
 import { setAdminAuthenticated } from '../../lib/storage';
 
 /** Kept in step with AdminDashboard's onNavigateTab, which already referred to
  *  'users' and 'analytics' before either tab existed. */
-type AdminTab = 'dashboard' | 'articles' | 'categories' | 'users' | 'analytics' | 'tickets' | 'settings';
+type AdminTab = 'dashboard' | 'articles' | 'categories' | 'resources' | 'users' | 'analytics' | 'tickets' | 'settings';
 
 interface AdminLayoutProps {
   articles: Article[];
@@ -150,6 +152,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
             <button
               onClick={() => {
+                setActiveTab('resources');
+                setEditingArticle(null);
+              }}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 cursor-pointer transition-colors ${
+                activeTab === 'resources'
+                  ? 'border-amber-400 text-amber-300 bg-stone-900/80'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              <span>Posters & Templates</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setActiveTab('users');
                 setEditingArticle(null);
               }}
@@ -246,6 +263,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             onCategoriesUpdated={onCategoriesUpdated}
           />
         )}
+
+        {activeTab === 'resources' && <ResourceManager categories={categories} />}
 
         {activeTab === 'users' && <UserManager />}
 
