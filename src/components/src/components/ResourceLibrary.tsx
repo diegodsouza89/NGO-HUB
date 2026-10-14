@@ -14,6 +14,8 @@ import { Category } from '../types';
 import {
   HubResource,
   KIND_LABELS,
+  KIND_ORDER,
+  KIND_PLURALS,
   ResourceKind,
   downloadResource,
   fetchResources,
@@ -77,7 +79,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
     }
   };
 
-  const tabs: Filter[] = ['all', 'poster', 'template', 'other'];
+  const tabs: Filter[] = ['all', ...KIND_ORDER];
   const countOf = (f: Filter) => (f === 'all' ? items.length : items.filter((r) => r.kind === f).length);
 
   return (
@@ -88,7 +90,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
           <span>Knowledge Hub Home</span>
         </button>
         <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-        <span className="text-sky-900 font-bold">Posters &amp; Templates</span>
+        <span className="text-sky-900 font-bold">Posters, SOPs &amp; Policy Templates</span>
       </div>
 
       <div className="bg-gradient-to-r from-sky-50 via-blue-50/60 to-sky-100/50 border border-sky-200/80 rounded-3xl p-6 sm:p-10 mb-8 shadow-xs">
@@ -96,9 +98,9 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
           <LayoutTemplate className="w-3.5 h-3.5 text-sky-700" />
           <span>Free to download and use</span>
         </div>
-        <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mb-3 leading-tight">Posters &amp; Templates</h1>
+        <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mb-3 leading-tight">Posters, SOPs &amp; Policy Templates</h1>
         <p className="text-slate-600 text-sm sm:text-base max-w-2xl leading-relaxed">
-          Ready-made posters and document templates for your organisation. Download, adapt and use them in your work.
+          Ready-made posters, SOPs, policy and document templates for your organisation. Download, adapt and use them in your work.
         </p>
       </div>
 
@@ -115,7 +117,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
                   (filter === f ? 'bg-sky-800 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50')
                 }
               >
-                {f === 'all' ? 'All' : KIND_LABELS[f] + 's'} ({countOf(f)})
+                {f === 'all' ? 'All' : KIND_PLURALS[f]} ({countOf(f)})
               </button>
             ))}
         </div>
@@ -124,7 +126,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search posters & templates"
+            placeholder="Search posters, SOPs & policies"
             className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-sky-600"
           />
         </label>
@@ -139,7 +141,7 @@ export const ResourceLibrary: React.FC<ResourceLibraryProps> = ({ categories, on
         <div className="py-12 text-center text-slate-600 text-sm">{error}</div>
       ) : !shown.length ? (
         <div className="py-12 text-center text-slate-600 text-sm">
-          {items.length ? 'Nothing matches your search.' : 'No posters or templates have been added yet.'}
+          {items.length ? 'Nothing matches your search.' : 'Nothing has been added yet.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
