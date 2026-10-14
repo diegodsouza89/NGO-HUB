@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS resources (
   id             TEXT    PRIMARY KEY,
   title          TEXT    NOT NULL,
   description    TEXT    NOT NULL DEFAULT '',
-  kind           TEXT    NOT NULL DEFAULT 'template',   -- 'poster' | 'sop' | 'policy' | 'template' | 'other'
+  kind           TEXT    NOT NULL DEFAULT 'template',   -- 'poster' | 'policy' | 'template' | 'other'
   category_id    TEXT,                                  -- optional link to a site category
   file_name      TEXT    NOT NULL,
   mime           TEXT    NOT NULL,
