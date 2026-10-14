@@ -121,3 +121,20 @@ Nothing extra to set up: it uses the existing `DB` binding and
 - The dashboard refreshes every minute while open. If it shows an amber
   message instead of "Live", enter the admin key in the Tickets tab.
 - Counting starts from the deploy. Older browser-only numbers are not imported.
+
+---
+
+## Posters & Templates (downloadable files)
+
+Admins upload posters and document templates in **/staff → Posters & Templates**;
+visitors download them from **/resources** (the "Posters & Templates" button in
+the top bar). Files are stored in the same D1 database — no R2 needed.
+
+1. In the D1 console, paste and run **RESOURCES-SCHEMA.sql** (safe to re-run).
+2. Make sure **CONTENT_ADMIN_KEY** is set on the Pages project (the same key used
+   by *Publish now* in Site Settings). Enter it once in the Posters & Templates tab.
+
+Limits: 25 MB per file. Allowed types: PDF, PNG, JPG, WEBP, Word, Excel,
+PowerPoint, ODT, CSV, TXT, ZIP. SVG and HTML are refused because they could run
+script on this site. Every 512 KB of a file is one D1 row, so a 10 MB poster is
+about 20 row writes on upload — far inside the free allowance.
