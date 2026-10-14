@@ -21,6 +21,8 @@ import {
   ACCEPT_ATTR,
   HubResource,
   KIND_LABELS,
+  KIND_ORDER,
+  KIND_PLURALS,
   MAX_FILE_BYTES,
   ResourceKind,
   deleteResource,
@@ -118,6 +120,8 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     setFile(f);
     if (!title.trim()) setTitle(titleFromFileName(f.name));
     if (/\.(png|jpe?g|webp)$/i.test(f.name)) setKind('poster');
+    else if (/\bsop\b|procedure/i.test(f.name)) setKind('sop');
+    else if (/polic/i.test(f.name)) setKind('policy');
     else if (/\.(docx?|xlsx?|pptx?|odt|csv|txt)$/i.test(f.name)) setKind('template');
   };
 
@@ -156,7 +160,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
       );
       setItems((prev) => [item, ...prev]);
       setNotice(
-        '“' + item.title + '” uploaded' + (item.published ? ' and is live on the Posters & Templates page.' : ' as a draft.')
+        '“' + item.title + '” uploaded' + (item.published ? ' and is live on the Posters, SOPs & Policy Templates page.' : ' as a draft.')
       );
       resetForm();
     } catch (err) {
@@ -241,10 +245,10 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-stone-900">Posters &amp; Templates</h2>
+          <h2 className="text-xl font-bold text-stone-900">Posters, SOPs &amp; Policy Templates</h2>
           <p className="text-sm text-stone-600 mt-1">
-            Upload posters and document templates. Published files appear on the public{' '}
-            <span className="font-semibold">Posters &amp; Templates</span> page for anyone to download.
+            Upload posters, SOPs, policies and document templates. Published files appear on the public{' '}
+            <span className="font-semibold">Posters, SOPs &amp; Policy Templates</span> page for anyone to download.
           </p>
         </div>
         <button
@@ -350,7 +354,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
           <label className="block">
             <span className="block text-xs font-semibold text-stone-700 mb-1">Type</span>
             <select value={kind} onChange={(e) => setKind(e.target.value as ResourceKind)} className={inputCls}>
-              {(Object.keys(KIND_LABELS) as ResourceKind[]).map((k) => (
+              {KIND_ORDER.map((k) => (
                 <option key={k} value={k}>
                   {KIND_LABELS[k]}
                 </option>
@@ -421,7 +425,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
       {/* List */}
       <div className="rounded-2xl border border-stone-200 bg-white">
         <div className="flex items-center gap-1 p-3 border-b border-stone-200 overflow-x-auto">
-          {(['all', 'poster', 'template', 'other'] as Filter[]).map((f) => (
+          {(['all', ...KIND_ORDER] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -430,7 +434,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
                 (filter === f ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100')
               }
             >
-              {f === 'all' ? 'All' : KIND_LABELS[f] + 's'} (
+              {f === 'all' ? 'All' : KIND_PLURALS[f]} (
               {f === 'all' ? items.length : items.filter((r) => r.kind === f).length})
             </button>
           ))}
@@ -468,7 +472,7 @@ export const ResourceManager: React.FC<ResourceManagerProps> = ({ categories }) 
                       onChange={(e) => setEditing({ ...editing, kind: e.target.value as ResourceKind })}
                       className={inputCls}
                     >
-                      {(Object.keys(KIND_LABELS) as ResourceKind[]).map((k) => (
+                      {KIND_ORDER.map((k) => (
                         <option key={k} value={k}>
                           {KIND_LABELS[k]}
                         </option>
