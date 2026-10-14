@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchMembers } from '../../lib/members';
+import { fetchMetrics } from '../../lib/metrics';
 import { 
   Eye, 
   FileText, 
@@ -34,10 +35,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onEditArticle,
   onCreateNewArticle,
 }) => {
-  // Member counts come from the server; re-render once they arrive.
-  const [, setMembersLoaded] = useState(0);
+  // Members, views and downloads all come from the server, so every admin on
+  // every browser sees the same numbers. Refreshed every minute while open.
+  const [, setLoaded] = useState(0);
   useEffect(() => {
-    fetchMembers().then((r) => { if (r.ok) setMembersLoaded((n) => n + 1); });
+    let cancelled = false;
+    const load = () =>
+      Promise.all([fetchMembers(), fetchMetrics(14)]).then(() => {
+        if (!cancelled) setLoaded((n) => n + 1);
+      });
+    load();
+    const timer = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
   const analytics = getAnalyticsData();
   const maxDayViews = Math.max(...analytics.days.map(d => d.views), 10);
@@ -136,19 +148,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               Daily readership across all non-profit technology guides and toolkits.
             </p>
           </div>
-          <span className="text-xs font-semibold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">
-            Live Metrics
-          </span>
+          {analytics.metricsLive ? (
+            <span
+              title={analytics.metricsUpdatedAt ? `Updated ${new Date(analytics.metricsUpdatedAt).toLocaleTimeString('en-IN')}` : undefined}
+              className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200"
+            >
+              Live · {analytics.visitors14d} visitors in 14 days
+            </span>
+          ) : (
+            <span
+              title={analytics.metricsError || undefined}
+              className="text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 max-w-xs truncate"
+            >
+              {analytics.metricsError || 'Loading live metrics…'}
+            </span>
+          )}
         </div>
 
         {/* CSS Bar Chart */}
         <div className="h-48 flex items-end justify-between gap-1 sm:gap-2 pt-6 pb-2 border-b border-slate-200">
           {analytics.days.map((day, idx) => {
-            const heightPercent = Math.max(12, Math.round((day.views / maxDayViews) * 100));
+            const heightPercent = day.views > 0 ? Math.max(6, Math.round((day.views / maxDayViews) * 100)) : 0;
             return (
               <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group relative">
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded-md pointer-events-none whitespace-nowrap z-10 shadow">
-                  {day.views} views ({day.displayDate})
+                  {day.views} views · {day.visitors} visitors ({day.displayDate})
                 </div>
 
                 <div 

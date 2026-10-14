@@ -100,3 +100,24 @@ Set **Support Email** in the portal's Site Settings. When the support desk is
 unreachable — a bad deploy, an outage — the contact form shows that address so
 the person has another way through. It is empty at the moment, so the error
 currently tells them to try again later and nothing more.
+
+---
+
+## Live metrics (views, downloads, visitors)
+
+Article views and downloads are recorded by `functions/api/metrics.js` in the
+same `ngo-hub` database, so the dashboard shows the same numbers on every
+browser. They used to be stored only in each visitor's own browser, which is
+why "Live Metrics" differed between browsers.
+
+Nothing extra to set up: it uses the existing `DB` binding and
+`TICKETS_ADMIN_KEY`, and creates its `article_events` table on first use
+(`METRICS-SCHEMA.sql` documents it).
+
+- A repeat view of the same article by the same visitor within 30 minutes
+  counts once.
+- Visitors are counted by a daily-changing hash; no IP address is stored.
+- Days are bucketed in India time.
+- The dashboard refreshes every minute while open. If it shows an amber
+  message instead of "Live", enter the admin key in the Tickets tab.
+- Counting starts from the deploy. Older browser-only numbers are not imported.

@@ -15,6 +15,7 @@ import {
   INITIAL_SETTINGS 
 } from '../data/initialData';
 import { getCachedMembers, reportActivity } from './members';
+import { trackArticleEvent, getCachedMetrics, getMetricsError, istDateKey } from './metrics';
 
 const KEYS = {
   SETTINGS: 'ngo_settings',
@@ -300,15 +301,33 @@ export function getLoginLogs(): LoginLog[] {
 }
 
 // --- Article View & Download Tracking ---
-export function incrementArticleView(articleId: string, language: Language = 'en'): void {
-  const articles = getArticles();
-  const article = articles.find(a => a.id === articleId);
-  if (article) {
-    article.views = (article.views || 0) + 1;
-    saveArticles(articles);
-  }
+//
+// Views and downloads are sent to /api/metrics (Cloudflare D1), so the admin
+// dashboard shows the same numbers on every browser. They used to be logged
+// only in this browser's localStorage (ngo_page_views / ngo_download_logs),
+// which is why "Live Metrics" differed from one browser to the next.
+//
+// The per-article counters below are still bumped locally so the reader sees
+// their own action reflected immediately; the dashboard ignores them.
 
-  // Also increment logged-in user page views count if logged in
+function bumpLocalCounter(articleId: string, field: 'views' | 'downloadsCount'): Article | undefined {
+  try {
+    const articles = getArticles();
+    const article = articles.find(a => a.id === articleId);
+    if (article) {
+      article[field] = (article[field] || 0) + 1;
+      saveArticles(articles);
+    }
+    return article;
+  } catch {
+    // A full or blocked localStorage must not break the article page.
+    return undefined;
+  }
+}
+
+export function incrementArticleView(articleId: string, language: Language = 'en'): void {
+  bumpLocalCounter(articleId, 'views');
+
   const currentUser = getCurrentUser();
   if (currentUser) {
     currentUser.pageViewsCount = (currentUser.pageViewsCount || 0) + 1;
@@ -316,35 +335,11 @@ export function incrementArticleView(articleId: string, language: Language = 'en
     reportActivity(currentUser, 'view');
   }
 
-  // Page view log
-  try {
-    const logsData = localStorage.getItem(KEYS.PAGE_VIEWS);
-    const logs: PageViewLog[] = logsData ? JSON.parse(logsData) : [];
-    const today = new Date().toISOString().split('T')[0];
-    
-    logs.push({
-      id: `pv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      articleId,
-      language,
-      date: today,
-      timestamp: Date.now(),
-      userId: currentUser?.id,
-    });
-
-    if (logs.length > 1000) logs.splice(0, logs.length - 1000);
-    localStorage.setItem(KEYS.PAGE_VIEWS, JSON.stringify(logs));
-  } catch (e) {
-    console.error('Failed to log page view:', e);
-  }
+  trackArticleEvent('view', articleId, language, currentUser?.id);
 }
 
-export function incrementResourceDownload(articleId: string): void {
-  const articles = getArticles();
-  const article = articles.find(a => a.id === articleId);
-  if (!article) return;
-
-  article.downloadsCount = (article.downloadsCount || 0) + 1;
-  saveArticles(articles);
+export function incrementResourceDownload(articleId: string, language: Language = 'en'): void {
+  bumpLocalCounter(articleId, 'downloadsCount');
 
   const currentUser = getCurrentUser();
   if (currentUser) {
@@ -353,27 +348,7 @@ export function incrementResourceDownload(articleId: string): void {
     reportActivity(currentUser, 'download');
   }
 
-  // Record Download Log
-  try {
-    const logsData = localStorage.getItem(KEYS.DOWNLOAD_LOGS);
-    const logs: DownloadLog[] = logsData ? JSON.parse(logsData) : [];
-    const today = new Date().toISOString().split('T')[0];
-
-    logs.unshift({
-      id: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      resourceId: articleId,
-      resourceTitle: article.titles.en || 'Untitled Resource',
-      userEmail: currentUser?.email,
-      organizationName: currentUser?.organizationName,
-      date: today,
-      timestamp: Date.now(),
-    });
-
-    if (logs.length > 1000) logs.splice(1000);
-    localStorage.setItem(KEYS.DOWNLOAD_LOGS, JSON.stringify(logs));
-  } catch (e) {
-    console.error('Failed to log download:', e);
-  }
+  trackArticleEvent('download', articleId, language, currentUser?.id);
 }
 
 export function voteArticleHelpful(articleId: string, helpful: boolean): { yes: number; no: number } {
@@ -388,6 +363,15 @@ export function voteArticleHelpful(articleId: string, helpful: boolean): { yes: 
   }
   saveArticles(articles);
   return { yes: article.helpfulYes, no: article.helpfulNo };
+}
+
+// One-time clean-up of the old browser-only logs. They only ever held this
+// browser's own activity and are no longer read by the dashboard.
+try {
+  localStorage.removeItem(KEYS.PAGE_VIEWS);
+  localStorage.removeItem(KEYS.DOWNLOAD_LOGS);
+} catch {
+  /* storage blocked - nothing to clean */
 }
 
 export function getPageViews(): PageViewLog[] {
@@ -409,53 +393,66 @@ export function getDownloadLogs(): DownloadLog[] {
 }
 
 // --- Analytics Calculations ---
+//
+// Views, downloads and visitors come from the server (/api/metrics) and
+// members/logins from /api/users. Both are fetched by the admin screens with
+// the admin key. Until they load, the numbers are zero rather than this
+// browser's own activity, so the dashboard never shows a misleading figure.
 export function getAnalyticsData() {
-  const articles = getArticles();
+  const localArticles = getArticles();
   const categories = getCategories();
   const users = getUsers();
   const loginLogs = getLoginLogs();
-  const pageViews = getPageViews();
-  const downloadLogs = getDownloadLogs();
+  const metrics = getCachedMetrics();
 
-  const totalViews = articles.reduce((sum, a) => sum + (a.views || 0), 0);
-  const totalDownloads = articles.reduce((sum, a) => sum + (a.downloadsCount || 0), 0);
-  const totalBookmarks = articles.reduce((sum, a) => sum + (a.bookmarkCount || 0), 0);
+  const counts = (id: string) => metrics?.articles[id] || { views: 0, downloads: 0 };
+  const articles = localArticles.map(a => ({
+    ...a,
+    views: counts(a.id).views,
+    downloadsCount: counts(a.id).downloads,
+  }));
 
-  // 14-day trend for user logins & views
-  const days: { date: string; displayDate: string; logins: number; views: number }[] = [];
+  const totalViews = metrics?.totals.views || 0;
+  const totalDownloads = metrics?.totals.downloads || 0;
+  const totalBookmarks = users.reduce((sum, u) => sum + (u.savedResourceIds?.length || 0), 0);
+
+  // Login counts per India-time day, to line up with how views are bucketed.
+  const loginsByDate: Record<string, number> = {};
+  loginLogs.forEach(l => {
+    const key = l.timestamp ? istDateKey(l.timestamp) : l.date;
+    loginsByDate[key] = (loginsByDate[key] || 0) + 1;
+  });
+
+  const days: { date: string; displayDate: string; logins: number; views: number; visitors: number; downloads: number }[] = [];
   for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    const displayDate = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-    
-    const dayLogins = loginLogs.filter(l => l.date === dateStr).length;
-    const dayViews = pageViews.filter(pv => pv.date === dateStr).length;
-    
+    const ms = Date.now() - i * 24 * 60 * 60 * 1000;
+    const dateStr = istDateKey(ms);
+    const displayDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+    const day = metrics?.byDate[dateStr];
     days.push({
       date: dateStr,
       displayDate,
-      // Real counts only. These two lines used to fall back to invented values
-      // - Math.floor((i % 4) + 1) for logins and totalViews / 20 for views - so the
-      // chart displayed traffic that never happened. An empty chart is better than
-      // a false one.
-      logins: dayLogins,
-      views: dayViews,
+      logins: loginsByDate[dateStr] || 0,
+      views: day?.views || 0,
+      visitors: day?.visitors || 0,
+      downloads: day?.downloads || 0,
     });
   }
 
-  // Sector breakdown among users
   const sectorCounts: Record<string, number> = {};
   users.forEach(u => {
     const s = u.sector || 'General NGO';
     sectorCounts[s] = (sectorCounts[s] || 0) + 1;
   });
 
-  // Top resources by views and downloads
-  const topReadResources = [...articles].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
-  const topDownloadedResources = [...articles].sort((a, b) => (b.downloadsCount || 0) - (a.downloadsCount || 0)).slice(0, 5);
+  const topReadResources = [...articles].sort((a, b) => b.views - a.views).slice(0, 5);
+  const topDownloadedResources = [...articles].sort((a, b) => b.downloadsCount - a.downloadsCount).slice(0, 5);
 
   return {
+    metricsLive: !!metrics,
+    metricsError: getMetricsError(),
+    metricsUpdatedAt: metrics?.generatedAt || null,
+    visitors14d: metrics?.visitorsInRange || 0,
     totalViews,
     totalDownloads,
     totalBookmarks,
@@ -512,7 +509,12 @@ export function exportLoginLogsCSV(): string {
 }
 
 export function exportResourceAnalyticsCSV(): string {
-  const articles = getArticles();
+  const metrics = getCachedMetrics();
+  const articles = getArticles().map(a => ({
+    ...a,
+    views: metrics?.articles[a.id]?.views || 0,
+    downloadsCount: metrics?.articles[a.id]?.downloads || 0,
+  }));
   const categories = getCategories();
   const headers = ['Resource ID', 'Title (EN)', 'Category', 'Resource Type', 'Target Sector', 'Published Status', 'Views', 'Downloads', 'Bookmarks', 'Helpful YES', 'Helpful NO', 'File Type'];
   

@@ -205,7 +205,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
    * reader's point of view, even though no file leaves the page.
    */
   const handleDownload = () => {
-    incrementResourceDownload(article.id);
+    incrementResourceDownload(article.id, currentLanguage);
     setDownloadCount(prev => prev + 1);
     window.print();
   };

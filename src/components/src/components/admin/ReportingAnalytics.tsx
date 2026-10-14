@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchMembers } from '../../lib/members';
+import { fetchMetrics } from '../../lib/metrics';
 import { 
   FileBarChart, 
   Download, 
@@ -20,10 +21,21 @@ import {
 } from '../../lib/storage';
 
 export const ReportingAnalytics: React.FC = () => {
-  // Member counts come from the server; re-render once they arrive.
-  const [, setMembersLoaded] = useState(0);
+  // Members, views and downloads all come from the server, so every admin on
+  // every browser sees the same numbers. Refreshed every minute while open.
+  const [, setLoaded] = useState(0);
   useEffect(() => {
-    fetchMembers().then((r) => { if (r.ok) setMembersLoaded((n) => n + 1); });
+    let cancelled = false;
+    const load = () =>
+      Promise.all([fetchMembers(), fetchMetrics(14)]).then(() => {
+        if (!cancelled) setLoaded((n) => n + 1);
+      });
+    load();
+    const timer = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
   const analytics = getAnalyticsData();
 
@@ -67,6 +79,15 @@ export const ReportingAnalytics: React.FC = () => {
           <h2 className="text-2xl font-bold tracking-tight">Reporting & Engagement Analytics</h2>
           <p className="text-xs text-sky-100/90 mt-1 max-w-xl">
             Monitor registered non-profit user registrations, visitor login activity, article readership, and resource toolkit downloads.
+          </p>
+          <p className="text-[11px] mt-2 font-semibold">
+            {analytics.metricsLive ? (
+              <span className="text-emerald-200">
+                ● Live from server · {analytics.visitors14d} unique visitors in the last 14 days
+              </span>
+            ) : (
+              <span className="text-amber-200">● {analytics.metricsError || 'Loading live metrics…'}</span>
+            )}
           </p>
         </div>
 
@@ -184,7 +205,7 @@ export const ReportingAnalytics: React.FC = () => {
                     className="w-1/2 bg-blue-500 group-hover:bg-blue-600 rounded-t-sm transition-all relative"
                   >
                     <span className="opacity-0 group-hover:opacity-100 absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap z-10 shadow">
-                      {d.views} views
+                      {d.views} views · {d.visitors} visitors
                     </span>
                   </div>
                 </div>
