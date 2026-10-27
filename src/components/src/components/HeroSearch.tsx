@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { Article, Category, Language } from '../types';
+import { heroLabels, DEFAULT_TAGLINE_EN } from '../lib/heroI18n';
 
 interface HeroSearchProps {
   currentLanguage: Language;
@@ -165,6 +166,10 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
   };
 
   const showPanel = isOpen && query.trim().length >= 2;
+  const t = heroLabels(currentLanguage);
+  // The tagline is admin-editable. Translate it only while it is still the
+  // default wording; a custom tagline is shown exactly as the admin wrote it.
+  const shownTagline = tagline.trim() === DEFAULT_TAGLINE_EN ? t.defaultTagline : tagline;
 
   return (
     <div className="relative bg-gradient-to-b from-sky-50 via-blue-50/50 to-slate-50 text-slate-900 py-12 sm:py-16 px-4 sm:px-6 border-b border-slate-200">
@@ -175,7 +180,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
           NGO Knowledge Hub
         </h1>
         <p className="text-slate-600 text-sm sm:text-base max-w-2xl mx-auto mb-6 font-normal leading-relaxed">
-          {tagline}
+          {shownTagline}
         </p>
 
         {/* ---------------------------------------------------------------- */}
@@ -190,7 +195,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
               role="combobox"
               aria-expanded={showPanel}
               aria-controls="hero-search-results"
-              aria-label="Search the knowledge hub"
+              aria-label={t.searchAria}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -198,7 +203,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
               }}
               onFocus={() => setIsOpen(true)}
               onKeyDown={onKeyDown}
-              placeholder="Search Google Workspace, cloud credits, CRM, cybersecurity…"
+              placeholder={t.searchPlaceholder}
               className="w-full rounded-2xl border border-slate-300 bg-white/95 pl-12 pr-11 py-3.5 text-sm sm:text-base text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100 transition"
             />
             {query && (
@@ -208,7 +213,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
                   setQuery('');
                   inputRef.current?.focus();
                 }}
-                aria-label="Clear search"
+                aria-label={t.clearSearch}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 rounded p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -224,8 +229,8 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
             >
               {hits.length === 0 ? (
                 <div className="px-4 py-5 text-sm text-slate-600">
-                  Nothing matched <span className="font-semibold text-slate-900">“{query.trim()}”</span>.
-                  Try a shorter word, or ask the AI assistant at the bottom right of the page.
+                  <span className="font-semibold text-slate-900">{t.noMatch(query.trim())}</span>{' '}
+                  {t.noMatchHint}
                 </div>
               ) : (
                 <>
@@ -269,7 +274,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
                   </ul>
                   <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500">
                     <CornerDownLeft className="w-3 h-3" />
-                    <span>Enter to open · ↑ ↓ to move · Esc to close</span>
+                    <span>{t.keyHint}</span>
                   </div>
                 </>
               )}
@@ -285,11 +290,11 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
               className="inline-flex items-center gap-2 rounded-2xl border border-sky-300 bg-white/90 hover:bg-sky-50 hover:border-sky-500 text-sky-900 font-semibold px-5 py-2.5 text-sm shadow-2xs transition-colors cursor-pointer"
             >
               <ClipboardCheck className="w-4 h-4 text-sky-700" />
-              <span>Begin self-assessment</span>
+              <span>{t.beginAssessment}</span>
               <ArrowRight className="w-4 h-4 text-sky-700" />
             </button>
             <span className="text-[11px] text-slate-500">
-              10 questions, about 3 minutes — see where your NGO stands and what to read first
+              {t.assessmentSub}
             </span>
           </div>
         )}
