@@ -14,7 +14,7 @@ import { AdminLayout } from './components/admin/AdminLayout';
 import { Footer } from './components/Footer';
 import { ResourceLibrary } from './components/ResourceLibrary';
 
-import { Category, Article, SiteSettings, Language, User as UserType } from './types';
+import { Category, Article, SiteSettings, Language, User as UserType, SUPPORTED_LANGUAGES } from './types';
 import { 
   getCategories, 
   getArticles, 
@@ -36,7 +36,21 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(getCurrentUser());
 
   // UI Navigation States
-  const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
+  // Remember the reader's language across reloads. Wrapped in try/catch because
+  // storage can be blocked (private windows, strict settings); the site then
+  // simply starts in English as before.
+  const LANGUAGE_KEY = 'ngo_language';
+  const [currentLanguage, setCurrentLanguageState] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem(LANGUAGE_KEY);
+      if (saved && SUPPORTED_LANGUAGES.some(l => l.code === saved)) return saved as Language;
+    } catch {}
+    return 'en';
+  });
+  const setCurrentLanguage = (lang: Language) => {
+    setCurrentLanguageState(lang);
+    try { localStorage.setItem(LANGUAGE_KEY, lang); } catch {}
+  };
   const getInitialView = (): 'home' | 'category' | 'article' | 'assessment' | 'resources' | 'admin_login' | 'admin_panel' => {
     if (typeof window !== 'undefined' && isAdminRoute(window.location.pathname)) {
       return isAdminAuthenticated() ? 'admin_panel' : 'admin_login';
