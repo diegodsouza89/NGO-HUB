@@ -57,7 +57,18 @@ export interface ArticleStructure {
   sourceNotes: string[];
 }
 
-const STEP_RE = /^step\s+(\d+)\s*[:.–-]\s*(.+)$/i;
+/**
+ * "Step 3: …" in every language the guides are published in.
+ *
+ * This only knew the English word, so in Hindi ("चरण 3:"), Marathi ("पायरी"),
+ * Tamil ("படி"), Telugu ("దశ"), Bengali ("ধাপ" / "পদক্ষেপ"), Gujarati
+ * ("પગલું") and Kannada ("ಹಂತ") no step was ever found, `rich` came back
+ * false, and every translated guide lost its step tracker, accordion and
+ * progress card. One guide's Hindi text also still says "Step"/"स्टेप", so
+ * both are accepted. A **bold** wrapper is tolerated.
+ */
+const STEP_WORDS = 'step|चरण|स्टेप|पायरी|படி|దశ|ধাপ|পদক্ষেপ|પગલું|ಹಂತ';
+const STEP_RE = new RegExp('^\\*{0,2}\\s*(?:' + STEP_WORDS + ')\\s*(\\d+)\\s*[:.–-]\\s*(.+?)\\s*\\*{0,2}$', 'iu');
 /**
  * A bullet line.
  *
@@ -71,7 +82,11 @@ const BULLET_RE = /^(?:[•·▪●]\s*\t?\s*|[-*]\s+)(.+)$/;
 const NUMBER_RE = /^(\d{1,2})[.)]\s*\t?\s*(.+)$/;
 const CALLOUT_RE = /^📌\s*(.*)$/;
 const BOX_RE = /^[☐☑☒✅]\s*(.*)$/;
-const SOURCES_RE = /^(sources?|references?|useful links?|further reading)\s*:?\s*$/i;
+const SOURCES_RE = /^\*{0,2}\s*(sources?|references?|useful links?|further reading|स्रोत|ஆதாரங்கள்|మూలాలు|সূত্র|તથ્યસૂત્ર|સ્ત્રોતો|સ્રોતો|ಮೂಲಗಳು)\s*:?\s*\*{0,2}$/iu;
+/** A closing "Note:" after the sources, in each language. */
+const NOTE_RE = /^(note|नोट|टीप|குறிப்பு|గమనిక|দ্রষ্টব্য|নোট|નોંધ|ಗಮನಿಸಿ|ಟಿಪ್ಪಣಿ)\s*:/iu;
+/** "Checklist" headings, so the closing checklist keeps its heading when moved. */
+const CHECKLIST_HEADING_RE = /check\s?list|चेकलिस्ट|तपासणी सूची|சரிபார்ப்பு|చెక్‌?లిస్ట్|চেকলিস্ট|ચેકલિસ્ટ|ಪರಿಶೀಲನಾ ಪಟ್ಟಿ/i;
 const RULE_RE = /^[-_=—]{3,}$/;
 const MD_HEADING_RE = /^(#{1,4})\s+(.+)$/;
 
@@ -119,8 +134,17 @@ function looksLikeHeading(line: string, prevBlank: boolean, nextNonEmpty: boolea
   const t = line.trim();
   if (t.length < 3 || t.length > 80) return false;
   if (/[.,;!]$/.test(t)) return false;
-  if (!/^[A-Z0-9“"]/.test(t)) return false;
   if (t.split(/\s+/).length > 12) return false;
+  // Indic scripts have no capital letters, so the case tests below can never
+  // pass for a Hindi or Tamil heading — the translated guides came out as one
+  // long run of paragraphs. A short standalone line written mostly in a
+  // non-Latin script, not ending like a sentence, is treated as a heading.
+  const nonLatin = (t.match(/[\u0900-\u0DFF]/g) || []).length;
+  if (nonLatin > 0 && nonLatin >= (t.match(/[A-Za-z]/g) || []).length) {
+    if (/[।:|]$/.test(t)) return /[?:]$/.test(t);
+    return t.length <= 70;
+  }
+  if (!/^[A-Z0-9“"]/.test(t)) return false;
   // A line that is mostly lower case is prose, not a heading.
   const letters = t.replace(/[^A-Za-z]/g, '');
   if (!letters) return false;
@@ -201,7 +225,9 @@ export function parseArticle(body: string, articleTitle?: string): ArticleStruct
     // "Prepared for NGOs  |  August 2026" and similar standfirst metadata.
     // It is shown as a small line under the title rather than dropped, so no
     // wording the author typed disappears without them deciding it should.
-    if (!seenBody && !metaLine && /^\*{0,2}prepared\s+for\b/i.test(line)) {
+    // Translations keep the "… | August 2026" shape but not the English words,
+    // so a short pre-body line ending in "| <month> <year>" counts too.
+    if (!seenBody && !metaLine && (/^\*{0,2}prepared\s+for\b/i.test(line) || (line.length < 90 && /\|\s*\S+\s+\d{4}\s*\**$/u.test(line)))) {
       metaLine = line.replace(/^\*\*(.*)\*\*$/, '$1').trim();
       continue;
     }
@@ -216,7 +242,7 @@ export function parseArticle(body: string, articleTitle?: string): ArticleStruct
 
     if (inSources) {
       // Once the sources are listed, a paragraph-length line is a closing note.
-      if (/^note\b/i.test(line) || line.length > 130) sourceNotes.push(line);
+      if (/^note\b/i.test(line) || NOTE_RE.test(line) || line.length > 130) sourceNotes.push(line);
       else sources.push(line);
       continue;
     }
@@ -359,7 +385,7 @@ export function parseArticle(body: string, articleTitle?: string): ArticleStruct
     blocks.forEach((b, i) => {
       if (b.kind !== 'checklist') return;
       const prev = blocks[i - 1];
-      if (prev && prev.kind === 'heading' && /check\s?list/i.test(prev.text) && !drop.has(i - 1)) {
+      if (prev && prev.kind === 'heading' && CHECKLIST_HEADING_RE.test(prev.text) && !drop.has(i - 1)) {
         drop.add(i - 1);
         moved.push(prev);
       }

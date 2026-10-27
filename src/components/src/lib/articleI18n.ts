@@ -1,0 +1,440 @@
+import { Language } from '../types';
+
+/**
+ * Interface text for the article reading page, in every language the guides
+ * are published in.
+ *
+ * The guide bodies were translated, but the page around them was not: a Hindi
+ * reader got Hindi steps inside English buttons ("Mark this step done",
+ * "Expand all", "Was this knowledge resource helpful…"). Every label the
+ * reading view shows comes from here instead. English is the fallback for any
+ * key a language is missing, so adding a label can never leave a blank button.
+ */
+export interface ArticleLabels {
+  knowledgeHub: string;
+  translationPending: (native: string, name: string) => string;
+  shownInEnglish: string;
+  views: string;
+  minRead: (n: number) => string;
+  updated: (date: string) => string;
+  recently: string;
+  save: string;
+  saved: string;
+  share: string;
+  copied: string;
+  theProcess: string;
+  nSteps: (n: number) => string;
+  sections: string;
+  readingTime: string;
+  minutes: (n: number) => string;
+  checklist: string;
+  nItems: (n: number) => string;
+  lastUpdated: string;
+  stepsInGuide: string;
+  showingAll: (n: number) => string;
+  stepOf: (a: number, b: number) => string;
+  allCollapsed: string;
+  collapseAll: string;
+  expandAll: string;
+  done: string;
+  markDone: string;
+  sources: string;
+  helpfulQ: string;
+  helpfulSub: string;
+  yes: string;
+  no: string;
+  yourProgress: string;
+  reset: string;
+  stepsDone: (a: number, b: number) => string;
+  itemsDone: (a: number, b: number) => string;
+  savedInBrowser: string;
+  thingsToTick: (n: number) => string;
+  tickedJump: (n: number) => string;
+  takeItWithYou: string;
+  saveAsPdf: string;
+  chooseSaveAsPdf: (n: number) => string;
+  relatedGuides: string;
+  guideTools: string;
+}
+
+const en: ArticleLabels = {
+  itemsDone: (a, b) => `${a} of ${b} done`,
+  knowledgeHub: 'Knowledge Hub',
+  translationPending: (native, name) => `Translation Pending for ${native} (${name})`,
+  shownInEnglish: 'This resource is currently displayed in English.',
+  views: 'views',
+  minRead: n => `~${n} min read`,
+  updated: d => `Updated ${d}`,
+  recently: 'Recently',
+  save: 'Save',
+  saved: 'Saved',
+  share: 'Share',
+  copied: 'Copied',
+  theProcess: 'The process',
+  nSteps: n => `${n} steps`,
+  sections: 'Sections',
+  readingTime: 'Reading time',
+  minutes: n => `~${n} min`,
+  checklist: 'Checklist',
+  nItems: n => `${n} items`,
+  lastUpdated: 'Last updated',
+  stepsInGuide: 'Steps in this guide',
+  showingAll: n => `Showing all ${n} steps`,
+  stepOf: (a, b) => `Step ${a} of ${b}`,
+  allCollapsed: 'All steps collapsed. Pick a number to open one.',
+  collapseAll: 'Collapse all',
+  expandAll: 'Expand all',
+  done: 'Done',
+  markDone: 'Mark this step done',
+  sources: 'Sources',
+  helpfulQ: 'Was this knowledge resource helpful for your NGO?',
+  helpfulSub: 'Your feedback helps us keep these technology guides accurate and useful.',
+  yes: 'Yes',
+  no: 'No',
+  yourProgress: 'Your progress',
+  reset: 'Reset',
+  stepsDone: (a, b) => `${a} of ${b} steps done`,
+  savedInBrowser: 'Saved in this browser, so you can come back mid-application.',
+  thingsToTick: n => `${n} things to tick off`,
+  tickedJump: n => `${n} ticked · jump to the list`,
+  takeItWithYou: 'Take it with you',
+  saveAsPdf: 'Save as PDF',
+  chooseSaveAsPdf: n => `Choose "Save as PDF" · ${n} downloads`,
+  relatedGuides: 'Related guides',
+  guideTools: 'Guide tools',
+};
+
+const hi: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b} में से ${a} पूरे`,
+  knowledgeHub: 'नॉलेज हब',
+  translationPending: (native) => `${native} में अनुवाद अभी उपलब्ध नहीं है`,
+  shownInEnglish: 'यह संसाधन अभी अंग्रेज़ी में दिखाया जा रहा है।',
+  views: 'बार देखा गया',
+  minRead: n => `~${n} मिनट में पढ़ें`,
+  updated: d => `अपडेट: ${d}`,
+  recently: 'हाल ही में',
+  save: 'सहेजें',
+  saved: 'सहेजा गया',
+  share: 'शेयर करें',
+  copied: 'कॉपी हो गया',
+  theProcess: 'प्रक्रिया',
+  nSteps: n => `${n} चरण`,
+  sections: 'खंड',
+  readingTime: 'पढ़ने का समय',
+  minutes: n => `~${n} मिनट`,
+  checklist: 'चेकलिस्ट',
+  nItems: n => `${n} बिंदु`,
+  lastUpdated: 'अंतिम अपडेट',
+  stepsInGuide: 'इस गाइड के चरण',
+  showingAll: n => `सभी ${n} चरण दिखाए जा रहे हैं`,
+  stepOf: (a, b) => `चरण ${a} / ${b}`,
+  allCollapsed: 'सभी चरण बंद हैं। कोई चरण खोलने के लिए उसकी संख्या चुनें।',
+  collapseAll: 'सभी बंद करें',
+  expandAll: 'सभी खोलें',
+  done: 'पूरा हुआ',
+  markDone: 'इस चरण को पूरा चिह्नित करें',
+  sources: 'स्रोत',
+  helpfulQ: 'क्या यह संसाधन आपके एनजीओ के लिए उपयोगी था?',
+  helpfulSub: 'आपकी प्रतिक्रिया से हम इन तकनीकी गाइड को सटीक और उपयोगी बनाए रखते हैं।',
+  yes: 'हाँ',
+  no: 'नहीं',
+  yourProgress: 'आपकी प्रगति',
+  reset: 'रीसेट',
+  stepsDone: (a, b) => `${b} में से ${a} चरण पूरे`,
+  savedInBrowser: 'यह इसी ब्राउज़र में सहेजा जाता है, ताकि आप आवेदन बीच में छोड़कर बाद में लौट सकें।',
+  thingsToTick: n => `${n} काम पूरे करने हैं`,
+  tickedJump: n => `${n} पूरे · सूची पर जाएँ`,
+  takeItWithYou: 'अपने साथ रखें',
+  saveAsPdf: 'PDF के रूप में सहेजें',
+  chooseSaveAsPdf: n => `"Save as PDF" चुनें · ${n} डाउनलोड`,
+  relatedGuides: 'संबंधित गाइड',
+  guideTools: 'गाइड टूल',
+};
+
+const mr: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b} पैकी ${a} पूर्ण`,
+  knowledgeHub: 'नॉलेज हब',
+  translationPending: (native) => `${native} मधील भाषांतर अद्याप उपलब्ध नाही`,
+  shownInEnglish: 'हे संसाधन सध्या इंग्रजीत दाखवले जात आहे.',
+  views: 'वेळा पाहिले',
+  minRead: n => `~${n} मिनिटांचे वाचन`,
+  updated: d => `अद्यतन: ${d}`,
+  recently: 'नुकतेच',
+  save: 'जतन करा',
+  saved: 'जतन केले',
+  share: 'शेअर करा',
+  copied: 'कॉपी झाले',
+  theProcess: 'प्रक्रिया',
+  nSteps: n => `${n} पायऱ्या`,
+  sections: 'विभाग',
+  readingTime: 'वाचनाचा वेळ',
+  minutes: n => `~${n} मिनिटे`,
+  checklist: 'तपासणी यादी',
+  nItems: n => `${n} मुद्दे`,
+  lastUpdated: 'शेवटचे अद्यतन',
+  stepsInGuide: 'या मार्गदर्शकातील पायऱ्या',
+  showingAll: n => `सर्व ${n} पायऱ्या दाखवत आहे`,
+  stepOf: (a, b) => `पायरी ${a} / ${b}`,
+  allCollapsed: 'सर्व पायऱ्या बंद आहेत. उघडण्यासाठी क्रमांक निवडा.',
+  collapseAll: 'सर्व बंद करा',
+  expandAll: 'सर्व उघडा',
+  done: 'पूर्ण',
+  markDone: 'ही पायरी पूर्ण म्हणून नोंदवा',
+  sources: 'स्रोत',
+  helpfulQ: 'हे संसाधन तुमच्या संस्थेसाठी उपयुक्त होते का?',
+  helpfulSub: 'तुमच्या अभिप्रायामुळे आम्ही ही तंत्रज्ञान मार्गदर्शके अचूक आणि उपयुक्त ठेवतो.',
+  yes: 'हो',
+  no: 'नाही',
+  yourProgress: 'तुमची प्रगती',
+  reset: 'रीसेट',
+  stepsDone: (a, b) => `${b} पैकी ${a} पायऱ्या पूर्ण`,
+  savedInBrowser: 'हे याच ब्राउझरमध्ये जतन होते, त्यामुळे अर्ज अर्धवट सोडून नंतर परत येऊ शकता.',
+  thingsToTick: n => `${n} गोष्टी पूर्ण करायच्या`,
+  tickedJump: n => `${n} पूर्ण · यादीकडे जा`,
+  takeItWithYou: 'सोबत ठेवा',
+  saveAsPdf: 'PDF म्हणून जतन करा',
+  chooseSaveAsPdf: n => `"Save as PDF" निवडा · ${n} डाउनलोड`,
+  relatedGuides: 'संबंधित मार्गदर्शके',
+  guideTools: 'मार्गदर्शक साधने',
+};
+
+const ta: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b} இல் ${a} முடிந்தது`,
+  knowledgeHub: 'அறிவு மையம்',
+  translationPending: (native) => `${native} மொழிபெயர்ப்பு இன்னும் தயாராகவில்லை`,
+  shownInEnglish: 'இந்த வழிகாட்டி தற்போது ஆங்கிலத்தில் காட்டப்படுகிறது.',
+  views: 'பார்வைகள்',
+  minRead: n => `~${n} நிமிட வாசிப்பு`,
+  updated: d => `புதுப்பிக்கப்பட்டது: ${d}`,
+  recently: 'சமீபத்தில்',
+  save: 'சேமி',
+  saved: 'சேமிக்கப்பட்டது',
+  share: 'பகிர்',
+  copied: 'நகலெடுக்கப்பட்டது',
+  theProcess: 'செயல்முறை',
+  nSteps: n => `${n} படிகள்`,
+  sections: 'பகுதிகள்',
+  readingTime: 'வாசிப்பு நேரம்',
+  minutes: n => `~${n} நிமிடம்`,
+  checklist: 'சரிபார்ப்புப் பட்டியல்',
+  nItems: n => `${n} உருப்படிகள்`,
+  lastUpdated: 'கடைசியாகப் புதுப்பித்தது',
+  stepsInGuide: 'இந்த வழிகாட்டியின் படிகள்',
+  showingAll: n => `அனைத்து ${n} படிகளும் காட்டப்படுகின்றன`,
+  stepOf: (a, b) => `படி ${a} / ${b}`,
+  allCollapsed: 'எல்லாப் படிகளும் மூடப்பட்டுள்ளன. திறக்க ஒரு எண்ணைத் தேர்ந்தெடுக்கவும்.',
+  collapseAll: 'அனைத்தையும் மூடு',
+  expandAll: 'அனைத்தையும் திற',
+  done: 'முடிந்தது',
+  markDone: 'இந்தப் படி முடிந்ததாகக் குறி',
+  sources: 'ஆதாரங்கள்',
+  helpfulQ: 'இந்த வழிகாட்டி உங்கள் நிறுவனத்திற்கு உதவியாக இருந்ததா?',
+  helpfulSub: 'உங்கள் கருத்து இந்த வழிகாட்டிகளைத் துல்லியமாகவும் பயனுள்ளதாகவும் வைத்திருக்க உதவுகிறது.',
+  yes: 'ஆம்',
+  no: 'இல்லை',
+  yourProgress: 'உங்கள் முன்னேற்றம்',
+  reset: 'மீட்டமை',
+  stepsDone: (a, b) => `${b} படிகளில் ${a} முடிந்தது`,
+  savedInBrowser: 'இந்த உலாவியில் சேமிக்கப்படுகிறது, எனவே இடையில் நிறுத்திவிட்டுப் பின்னர் தொடரலாம்.',
+  thingsToTick: n => `${n} செய்ய வேண்டியவை`,
+  tickedJump: n => `${n} முடிந்தது · பட்டியலுக்குச் செல்`,
+  takeItWithYou: 'உங்களுடன் எடுத்துச் செல்லுங்கள்',
+  saveAsPdf: 'PDF ஆகச் சேமி',
+  chooseSaveAsPdf: n => `"Save as PDF" ஐத் தேர்ந்தெடுக்கவும் · ${n} பதிவிறக்கங்கள்`,
+  relatedGuides: 'தொடர்புடைய வழிகாட்டிகள்',
+  guideTools: 'வழிகாட்டிக் கருவிகள்',
+};
+
+const te: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b}లో ${a} పూర్తి`,
+  knowledgeHub: 'నాలెడ్జ్ హబ్',
+  translationPending: (native) => `${native} అనువాదం ఇంకా అందుబాటులో లేదు`,
+  shownInEnglish: 'ఈ గైడ్ ప్రస్తుతం ఇంగ్లీష్‌లో చూపబడుతోంది.',
+  views: 'వీక్షణలు',
+  minRead: n => `~${n} నిమిషాల చదువు`,
+  updated: d => `నవీకరించబడింది: ${d}`,
+  recently: 'ఇటీవల',
+  save: 'సేవ్ చేయండి',
+  saved: 'సేవ్ అయింది',
+  share: 'షేర్ చేయండి',
+  copied: 'కాపీ అయింది',
+  theProcess: 'ప్రక్రియ',
+  nSteps: n => `${n} దశలు`,
+  sections: 'విభాగాలు',
+  readingTime: 'చదివే సమయం',
+  minutes: n => `~${n} నిమి`,
+  checklist: 'చెక్‌లిస్ట్',
+  nItems: n => `${n} అంశాలు`,
+  lastUpdated: 'చివరి నవీకరణ',
+  stepsInGuide: 'ఈ గైడ్‌లోని దశలు',
+  showingAll: n => `మొత్తం ${n} దశలు చూపుతోంది`,
+  stepOf: (a, b) => `దశ ${a} / ${b}`,
+  allCollapsed: 'అన్ని దశలు మూసి ఉన్నాయి. తెరవడానికి ఒక సంఖ్యను ఎంచుకోండి.',
+  collapseAll: 'అన్నీ మూసివేయండి',
+  expandAll: 'అన్నీ తెరవండి',
+  done: 'పూర్తయింది',
+  markDone: 'ఈ దశను పూర్తయినట్లు గుర్తించండి',
+  sources: 'మూలాలు',
+  helpfulQ: 'ఈ గైడ్ మీ సంస్థకు ఉపయోగపడిందా?',
+  helpfulSub: 'మీ అభిప్రాయం ఈ గైడ్‌లను కచ్చితంగా, ఉపయోగకరంగా ఉంచడానికి సహాయపడుతుంది.',
+  yes: 'అవును',
+  no: 'కాదు',
+  yourProgress: 'మీ పురోగతి',
+  reset: 'రీసెట్',
+  stepsDone: (a, b) => `${b} దశల్లో ${a} పూర్తయ్యాయి`,
+  savedInBrowser: 'ఇది ఈ బ్రౌజర్‌లోనే సేవ్ అవుతుంది, కాబట్టి మధ్యలో ఆపి తర్వాత కొనసాగించవచ్చు.',
+  thingsToTick: n => `${n} పనులు పూర్తి చేయాలి`,
+  tickedJump: n => `${n} పూర్తి · జాబితాకు వెళ్లండి`,
+  takeItWithYou: 'మీతో తీసుకెళ్లండి',
+  saveAsPdf: 'PDFగా సేవ్ చేయండి',
+  chooseSaveAsPdf: n => `"Save as PDF" ఎంచుకోండి · ${n} డౌన్‌లోడ్‌లు`,
+  relatedGuides: 'సంబంధిత గైడ్‌లు',
+  guideTools: 'గైడ్ సాధనాలు',
+};
+
+const bn: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b}টির মধ্যে ${a}টি সম্পন্ন`,
+  knowledgeHub: 'নলেজ হাব',
+  translationPending: (native) => `${native} অনুবাদ এখনও প্রস্তুত নয়`,
+  shownInEnglish: 'এই গাইডটি এখন ইংরেজিতে দেখানো হচ্ছে।',
+  views: 'বার দেখা হয়েছে',
+  minRead: n => `~${n} মিনিটে পড়া`,
+  updated: d => `হালনাগাদ: ${d}`,
+  recently: 'সম্প্রতি',
+  save: 'সংরক্ষণ',
+  saved: 'সংরক্ষিত',
+  share: 'শেয়ার',
+  copied: 'কপি হয়েছে',
+  theProcess: 'প্রক্রিয়া',
+  nSteps: n => `${n}টি ধাপ`,
+  sections: 'অংশ',
+  readingTime: 'পড়ার সময়',
+  minutes: n => `~${n} মিনিট`,
+  checklist: 'চেকলিস্ট',
+  nItems: n => `${n}টি বিষয়`,
+  lastUpdated: 'সর্বশেষ হালনাগাদ',
+  stepsInGuide: 'এই গাইডের ধাপগুলি',
+  showingAll: n => `সব ${n}টি ধাপ দেখানো হচ্ছে`,
+  stepOf: (a, b) => `ধাপ ${a} / ${b}`,
+  allCollapsed: 'সব ধাপ বন্ধ আছে। খুলতে একটি সংখ্যা বেছে নিন।',
+  collapseAll: 'সব বন্ধ করুন',
+  expandAll: 'সব খুলুন',
+  done: 'সম্পন্ন',
+  markDone: 'এই ধাপটি সম্পন্ন হিসেবে চিহ্নিত করুন',
+  sources: 'সূত্র',
+  helpfulQ: 'এই গাইডটি কি আপনার এনজিওর কাজে লেগেছে?',
+  helpfulSub: 'আপনার মতামত আমাদের এই গাইডগুলি নির্ভুল ও কাজের রাখতে সাহায্য করে।',
+  yes: 'হ্যাঁ',
+  no: 'না',
+  yourProgress: 'আপনার অগ্রগতি',
+  reset: 'রিসেট',
+  stepsDone: (a, b) => `${b}টির মধ্যে ${a}টি ধাপ সম্পন্ন`,
+  savedInBrowser: 'এটি এই ব্রাউজারেই সংরক্ষিত থাকে, তাই মাঝপথে থেমে পরে ফিরে আসতে পারেন।',
+  thingsToTick: n => `${n}টি কাজ বাকি`,
+  tickedJump: n => `${n}টি সম্পন্ন · তালিকায় যান`,
+  takeItWithYou: 'সঙ্গে রাখুন',
+  saveAsPdf: 'PDF হিসেবে সংরক্ষণ',
+  chooseSaveAsPdf: n => `"Save as PDF" বেছে নিন · ${n} ডাউনলোড`,
+  relatedGuides: 'সম্পর্কিত গাইড',
+  guideTools: 'গাইড টুল',
+};
+
+const gu: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b}માંથી ${a} પૂર્ણ`,
+  knowledgeHub: 'નોલેજ હબ',
+  translationPending: (native) => `${native} અનુવાદ હજુ ઉપલબ્ધ નથી`,
+  shownInEnglish: 'આ માર્ગદર્શિકા હાલમાં અંગ્રેજીમાં બતાવવામાં આવે છે.',
+  views: 'વખત જોવાયું',
+  minRead: n => `~${n} મિનિટનું વાંચન`,
+  updated: d => `અપડેટ: ${d}`,
+  recently: 'તાજેતરમાં',
+  save: 'સાચવો',
+  saved: 'સાચવ્યું',
+  share: 'શેર કરો',
+  copied: 'કૉપિ થયું',
+  theProcess: 'પ્રક્રિયા',
+  nSteps: n => `${n} પગલાં`,
+  sections: 'વિભાગો',
+  readingTime: 'વાંચન સમય',
+  minutes: n => `~${n} મિનિટ`,
+  checklist: 'ચેકલિસ્ટ',
+  nItems: n => `${n} મુદ્દા`,
+  lastUpdated: 'છેલ્લું અપડેટ',
+  stepsInGuide: 'આ માર્ગદર્શિકાનાં પગલાં',
+  showingAll: n => `બધાં ${n} પગલાં બતાવી રહ્યાં છીએ`,
+  stepOf: (a, b) => `પગલું ${a} / ${b}`,
+  allCollapsed: 'બધાં પગલાં બંધ છે. ખોલવા માટે કોઈ નંબર પસંદ કરો.',
+  collapseAll: 'બધું બંધ કરો',
+  expandAll: 'બધું ખોલો',
+  done: 'પૂર્ણ',
+  markDone: 'આ પગલું પૂર્ણ તરીકે ચિહ્નિત કરો',
+  sources: 'સ્ત્રોતો',
+  helpfulQ: 'શું આ માર્ગદર્શિકા તમારી એનજીઓ માટે ઉપયોગી હતી?',
+  helpfulSub: 'તમારો પ્રતિસાદ અમને આ માર્ગદર્શિકાઓ સચોટ અને ઉપયોગી રાખવામાં મદદ કરે છે.',
+  yes: 'હા',
+  no: 'ના',
+  yourProgress: 'તમારી પ્રગતિ',
+  reset: 'રીસેટ',
+  stepsDone: (a, b) => `${b}માંથી ${a} પગલાં પૂર્ણ`,
+  savedInBrowser: 'આ આ જ બ્રાઉઝરમાં સચવાય છે, તેથી અરજી અધવચ્ચે છોડીને પછી પાછા આવી શકો છો.',
+  thingsToTick: n => `${n} કામ પૂરાં કરવાનાં`,
+  tickedJump: n => `${n} પૂર્ણ · યાદી પર જાઓ`,
+  takeItWithYou: 'સાથે રાખો',
+  saveAsPdf: 'PDF તરીકે સાચવો',
+  chooseSaveAsPdf: n => `"Save as PDF" પસંદ કરો · ${n} ડાઉનલોડ`,
+  relatedGuides: 'સંબંધિત માર્ગદર્શિકાઓ',
+  guideTools: 'માર્ગદર્શિકા સાધનો',
+};
+
+const kn: Partial<ArticleLabels> = {
+  itemsDone: (a, b) => `${b}ರಲ್ಲಿ ${a} ಪೂರ್ಣ`,
+  knowledgeHub: 'ಜ್ಞಾನ ಕೇಂದ್ರ',
+  translationPending: (native) => `${native} ಅನುವಾದ ಇನ್ನೂ ಲಭ್ಯವಿಲ್ಲ`,
+  shownInEnglish: 'ಈ ಮಾರ್ಗದರ್ಶಿ ಸದ್ಯ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ತೋರಿಸಲಾಗುತ್ತಿದೆ.',
+  views: 'ವೀಕ್ಷಣೆಗಳು',
+  minRead: n => `~${n} ನಿಮಿಷದ ಓದು`,
+  updated: d => `ನವೀಕರಿಸಲಾಗಿದೆ: ${d}`,
+  recently: 'ಇತ್ತೀಚೆಗೆ',
+  save: 'ಉಳಿಸಿ',
+  saved: 'ಉಳಿಸಲಾಗಿದೆ',
+  share: 'ಹಂಚಿಕೊಳ್ಳಿ',
+  copied: 'ನಕಲಿಸಲಾಗಿದೆ',
+  theProcess: 'ಪ್ರಕ್ರಿಯೆ',
+  nSteps: n => `${n} ಹಂತಗಳು`,
+  sections: 'ವಿಭಾಗಗಳು',
+  readingTime: 'ಓದುವ ಸಮಯ',
+  minutes: n => `~${n} ನಿಮಿಷ`,
+  checklist: 'ಪರಿಶೀಲನಾ ಪಟ್ಟಿ',
+  nItems: n => `${n} ಅಂಶಗಳು`,
+  lastUpdated: 'ಕೊನೆಯ ನವೀಕರಣ',
+  stepsInGuide: 'ಈ ಮಾರ್ಗದರ್ಶಿಯ ಹಂತಗಳು',
+  showingAll: n => `ಎಲ್ಲಾ ${n} ಹಂತಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ`,
+  stepOf: (a, b) => `ಹಂತ ${a} / ${b}`,
+  allCollapsed: 'ಎಲ್ಲಾ ಹಂತಗಳು ಮುಚ್ಚಿವೆ. ತೆರೆಯಲು ಒಂದು ಸಂಖ್ಯೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.',
+  collapseAll: 'ಎಲ್ಲವನ್ನೂ ಮುಚ್ಚಿ',
+  expandAll: 'ಎಲ್ಲವನ್ನೂ ತೆರೆಯಿರಿ',
+  done: 'ಪೂರ್ಣಗೊಂಡಿದೆ',
+  markDone: 'ಈ ಹಂತವನ್ನು ಪೂರ್ಣಗೊಂಡಿದೆ ಎಂದು ಗುರುತಿಸಿ',
+  sources: 'ಮೂಲಗಳು',
+  helpfulQ: 'ಈ ಮಾರ್ಗದರ್ಶಿ ನಿಮ್ಮ ಎನ್‌ಜಿಒಗೆ ಉಪಯುಕ್ತವಾಗಿತ್ತೇ?',
+  helpfulSub: 'ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಈ ಮಾರ್ಗದರ್ಶಿಗಳನ್ನು ನಿಖರವಾಗಿ ಮತ್ತು ಉಪಯುಕ್ತವಾಗಿಡಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ.',
+  yes: 'ಹೌದು',
+  no: 'ಇಲ್ಲ',
+  yourProgress: 'ನಿಮ್ಮ ಪ್ರಗತಿ',
+  reset: 'ಮರುಹೊಂದಿಸಿ',
+  stepsDone: (a, b) => `${b} ಹಂತಗಳಲ್ಲಿ ${a} ಪೂರ್ಣ`,
+  savedInBrowser: 'ಇದು ಈ ಬ್ರೌಸರ್‌ನಲ್ಲೇ ಉಳಿಯುತ್ತದೆ, ಆದ್ದರಿಂದ ಅರ್ಧದಲ್ಲಿ ನಿಲ್ಲಿಸಿ ನಂತರ ಮುಂದುವರಿಸಬಹುದು.',
+  thingsToTick: n => `${n} ಕೆಲಸಗಳು ಬಾಕಿ`,
+  tickedJump: n => `${n} ಪೂರ್ಣ · ಪಟ್ಟಿಗೆ ಹೋಗಿ`,
+  takeItWithYou: 'ನಿಮ್ಮೊಂದಿಗೆ ಇರಿಸಿಕೊಳ್ಳಿ',
+  saveAsPdf: 'PDF ಆಗಿ ಉಳಿಸಿ',
+  chooseSaveAsPdf: n => `"Save as PDF" ಆಯ್ಕೆಮಾಡಿ · ${n} ಡೌನ್‌ಲೋಡ್‌ಗಳು`,
+  relatedGuides: 'ಸಂಬಂಧಿತ ಮಾರ್ಗದರ್ಶಿಗಳು',
+  guideTools: 'ಮಾರ್ಗದರ್ಶಿ ಪರಿಕರಗಳು',
+};
+
+const TABLE: Record<string, Partial<ArticleLabels>> = { en, hi, mr, ta, te, bn, gu, kn };
+
+export function articleLabels(lang: Language | string): ArticleLabels {
+  return { ...en, ...(TABLE[lang] || {}) } as ArticleLabels;
+}
