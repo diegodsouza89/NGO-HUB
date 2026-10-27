@@ -31,6 +31,7 @@ import {
   getCurrentUser
 } from '../lib/storage';
 import { parseArticle, Block } from '../lib/articleStructure';
+import { articleLabels } from '../lib/articleI18n';
 
 interface ArticleViewProps {
   article: Article;
@@ -124,6 +125,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
   const body = article.bodies[currentLanguage] || article.bodies.en || "";
 
   const activeLangInfo = SUPPORTED_LANGUAGES.find(l => l.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
+  const t = articleLabels(currentLanguage);
 
   const wordCount = body.trim().split(/\s+/).length;
   const readingTime = Math.max(1, Math.ceil(wordCount / 180));
@@ -460,10 +462,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
             <div className="flex items-center gap-2 px-4 sm:px-5 py-3 border-b border-slate-200 bg-white">
               <ListChecks className="w-4 h-4 text-sky-700" />
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Checklist
+                {t.checklist}
               </span>
               <span className="text-xs text-slate-500 ml-auto">
-                {block.items.filter(it => ticked.includes(it)).length} of {block.items.length} done
+                {t.itemsDone(block.items.filter(it => ticked.includes(it)).length, block.items.length)}
               </span>
             </div>
             <ul className="divide-y divide-slate-200">
@@ -574,16 +576,16 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
 
   const summaryTiles: { label: string; value: string }[] = [];
   if (isStepped) {
-    summaryTiles.push({ label: 'The process', value: steps.length + ' steps' });
+    summaryTiles.push({ label: t.theProcess, value: t.nSteps(steps.length) });
   } else {
     const sections = structure.intro.filter(b => b.kind === 'heading').length;
-    if (sections >= 2) summaryTiles.push({ label: 'Sections', value: String(sections) });
+    if (sections >= 2) summaryTiles.push({ label: t.sections, value: String(sections) });
   }
-  summaryTiles.push({ label: 'Reading time', value: '~' + readingTime + ' min' });
+  summaryTiles.push({ label: t.readingTime, value: t.minutes(readingTime) });
   if (structure.checklistCount) {
-    summaryTiles.push({ label: 'Checklist', value: structure.checklistCount + ' items' });
+    summaryTiles.push({ label: t.checklist, value: t.nItems(structure.checklistCount) });
   } else if (article.updatedAt) {
-    summaryTiles.push({ label: 'Last updated', value: article.updatedAt });
+    summaryTiles.push({ label: t.lastUpdated, value: article.updatedAt });
   }
 
   const openStepInfo = steps.find(s => s.n === openStep) || null;
@@ -597,7 +599,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
           className="hover:text-sky-800 flex items-center gap-1 cursor-pointer transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Knowledge Hub</span>
+          <span>{t.knowledgeHub}</span>
         </button>
         {category && (
           <>
@@ -620,10 +622,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
           <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold">
-              Translation Pending for {activeLangInfo.nativeName} ({activeLangInfo.name})
+              {t.translationPending(activeLangInfo.nativeName, activeLangInfo.name)}
             </p>
             <p className="text-amber-700 mt-0.5">
-              This resource is currently displayed in English.
+              {t.shownInEnglish}
             </p>
           </div>
         </div>
@@ -665,15 +667,15 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 text-xs text-slate-500 font-medium">
           <span className="flex items-center gap-1">
             <Eye className="w-3.5 h-3.5 text-sky-700" />
-            <strong className="text-slate-700">{(article.views || 0) + 1}</strong> views
+            <strong className="text-slate-700">{(article.views || 0) + 1}</strong> {t.views}
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            ~{readingTime} min read
+            {t.minRead(readingTime)}
           </span>
           <span className="flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            Updated {article.updatedAt || 'Recently'}
+            {t.updated(article.updatedAt || t.recently)}
           </span>
           <span className="ml-auto flex items-center gap-2">
             <button
@@ -685,14 +687,14 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               }`}
             >
               <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-600 text-amber-600' : ''}`} />
-              <span>{isBookmarked ? 'Saved' : 'Save'}</span>
+              <span>{isBookmarked ? t.saved : t.save}</span>
             </button>
             <button
               onClick={handleCopyLink}
               className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-sky-600" /> : <Share2 className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Share'}</span>
+              <span>{copied ? t.copied : t.share}</span>
             </button>
           </span>
         </div>
@@ -726,7 +728,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                   Explicitly" has no honest one-word label, so the open step is
                   named in full underneath instead. */}
               <nav
-                aria-label="Steps in this guide"
+                aria-label={t.stepsInGuide}
                 className="bg-white rounded-2xl border border-slate-200 p-3 mb-5 shadow-xs"
               >
                 <ol className="flex items-center gap-1.5">
@@ -761,18 +763,18 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                   <p className="text-xs text-slate-500 min-w-0">
                     {expandAll ? (
                       <span className="font-semibold text-slate-700">
-                        Showing all {steps.length} steps
+                        {t.showingAll(steps.length)}
                       </span>
                     ) : openStepInfo ? (
                       <>
                         <span className="font-semibold text-slate-700">
-                          Step {openStepInfo.n} of {steps.length}
+                          {t.stepOf(openStepInfo.n, steps.length)}
                         </span>
                         {' \u00b7 '}
                         {openStepInfo.title}
                       </>
                     ) : (
-                      <>All steps collapsed. Pick a number to open one.</>
+                      <>{t.allCollapsed}</>
                     )}
                   </p>
                   <button
@@ -780,7 +782,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                     onClick={() => { setExpandAll(!expandAll); if (!expandAll) setOpenStep(null); }}
                     className="text-xs font-semibold text-sky-700 hover:text-sky-900 shrink-0 cursor-pointer underline decoration-sky-200 underline-offset-2"
                   >
-                    {expandAll ? 'Collapse all' : 'Expand all'}
+                    {expandAll ? t.collapseAll : t.expandAll}
                   </button>
                 </div>
               </nav>
@@ -846,7 +848,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                             }`}
                           >
                             <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                            {isDone ? 'Done' : 'Mark this step done'}
+                            {isDone ? t.done : t.markDone}
                           </button>
                         </div>
                       )}
@@ -870,7 +872,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
             <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-7 shadow-xs mb-5">
               <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-700 mb-3">
                 <Link2 className="w-4 h-4 text-sky-700" />
-                Sources
+                {t.sources}
               </h2>
               <ul className="space-y-1.5 mb-4 last:mb-0">
                 {structure.sources.map((src, i) => (
@@ -892,10 +894,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h4 className="font-bold text-slate-900 text-sm mb-1">
-                Was this knowledge resource helpful for your NGO?
+                {t.helpfulQ}
               </h4>
               <p className="text-slate-500 text-xs">
-                Your feedback helps us keep these technology guides accurate and useful.
+                {t.helpfulSub}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
@@ -909,7 +911,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                 }`}
               >
                 <ThumbsUp className="w-4 h-4" />
-                <span>Yes ({helpfulCounts.yes})</span>
+                <span>{t.yes} ({helpfulCounts.yes})</span>
               </button>
               <button
                 onClick={() => handleVote(false)}
@@ -921,19 +923,19 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                 }`}
               >
                 <ThumbsDown className="w-4 h-4" />
-                <span>No ({helpfulCounts.no})</span>
+                <span>{t.no} ({helpfulCounts.no})</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Sidebar */}
-        <aside aria-label="Guide tools" className="lg:sticky lg:top-6 space-y-3.5">
+        <aside aria-label={t.guideTools} className="lg:sticky lg:top-6 space-y-3.5">
           {isStepped && (
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Your progress
+                  {t.yourProgress}
                 </span>
                 {(doneCount > 0 || ticked.length > 0) && (
                   <button
@@ -942,7 +944,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                     className="text-[10px] font-semibold text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    Reset
+                    {t.reset}
                   </button>
                 )}
               </div>
@@ -953,10 +955,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
                 />
               </div>
               <p className="text-xs text-slate-600 font-medium">
-                {doneCount} of {steps.length} steps done
+                {t.stepsDone(doneCount, steps.length)}
               </p>
               <p className="text-[11px] text-slate-400 mt-1.5 leading-5">
-                Saved in this browser, so you can come back mid-application.
+                {t.savedInBrowser}
               </p>
             </div>
           )}
@@ -970,31 +972,31 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               <div className="flex items-center gap-2 mb-1">
                 <ListChecks className="w-4 h-4 text-sky-700" />
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Checklist
+                  {t.checklist}
                 </span>
               </div>
               <p className="text-sm font-bold text-slate-900 group-hover:text-sky-900">
-                {structure.checklistCount} things to tick off
+                {t.thingsToTick(structure.checklistCount)}
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {ticked.length} ticked · jump to the list
+                {t.tickedJump(ticked.length)}
               </p>
             </button>
           )}
 
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-              Take it with you
+              {t.takeItWithYou}
             </div>
             <button
               onClick={handleDownload}
               className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4 text-sky-200" />
-              Save as PDF
+              {t.saveAsPdf}
             </button>
             <p className="text-[11px] text-slate-400 mt-2 text-center">
-              Choose "Save as PDF" · {downloadCount} downloads
+              {t.chooseSaveAsPdf(downloadCount)}
             </p>
           </div>
 
@@ -1003,7 +1005,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               <div className="flex items-center gap-2 mb-2.5">
                 <Layers className="w-4 h-4 text-sky-700" />
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Related guides
+                  {t.relatedGuides}
                 </span>
               </div>
               <ul className="divide-y divide-slate-100">
