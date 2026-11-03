@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight } from 'lucide-react';
+import { Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 import { heroLabels, DEFAULT_TAGLINE_EN } from '../lib/heroI18n';
 
@@ -13,6 +13,7 @@ interface HeroSearchProps {
   selectedResourceType: string;
   onSelectResourceType: (type: string) => void;
   onStartAssessment?: () => void;
+  onOpenScamCheck?: () => void;
 }
 
 type Hit =
@@ -56,6 +57,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
   onSelectCategory,
   tagline,
   onStartAssessment,
+  onOpenScamCheck,
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -281,6 +283,20 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
             </div>
           )}
         </div>
+
+        {onOpenScamCheck && (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              onClick={onOpenScamCheck}
+              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 font-semibold px-5 py-2.5 text-sm shadow-2xs transition-colors cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <span>Got a suspicious message? Check if it's a scam</span>
+              <ArrowRight className="w-4 h-4 text-emerald-700" />
+            </button>
+          </div>
+        )}
 
         {onStartAssessment && (
           <div className="mt-6 flex flex-col items-center gap-2">
