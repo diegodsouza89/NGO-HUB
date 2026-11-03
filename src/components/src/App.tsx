@@ -13,6 +13,7 @@ import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { Footer } from './components/Footer';
 import { ResourceLibrary } from './components/ResourceLibrary';
+import { ScamChecker } from './components/ScamChecker';
 
 import { Category, Article, SiteSettings, Language, User as UserType, SUPPORTED_LANGUAGES } from './types';
 import { 
@@ -28,6 +29,7 @@ import { syncPublishedContent } from './lib/syncRepoContent';
 export default function App() {
   const isAdminRoute = (path: string) => path === '/admin' || path === '/staff';
   const RESOURCES_PATH = '/resources';
+  const SCAM_CHECK_PATH = '/scam-check';
 
   // Core Data States
   const [categories, setCategories] = useState<Category[]>([]);
@@ -51,14 +53,15 @@ export default function App() {
     setCurrentLanguageState(lang);
     try { localStorage.setItem(LANGUAGE_KEY, lang); } catch {}
   };
-  const getInitialView = (): 'home' | 'category' | 'article' | 'assessment' | 'resources' | 'admin_login' | 'admin_panel' => {
+  const getInitialView = (): 'home' | 'category' | 'article' | 'assessment' | 'resources' | 'scam_check' | 'admin_login' | 'admin_panel' => {
     if (typeof window !== 'undefined' && isAdminRoute(window.location.pathname)) {
       return isAdminAuthenticated() ? 'admin_panel' : 'admin_login';
     }
     if (typeof window !== 'undefined' && window.location.pathname === RESOURCES_PATH) return 'resources';
+    if (typeof window !== 'undefined' && window.location.pathname === SCAM_CHECK_PATH) return 'scam_check';
     return 'home';
   };
-  const [currentView, setCurrentView] = useState<'home' | 'category' | 'article' | 'assessment' | 'resources' | 'admin_login' | 'admin_panel'>(getInitialView);
+  const [currentView, setCurrentView] = useState<'home' | 'category' | 'article' | 'assessment' | 'resources' | 'scam_check' | 'admin_login' | 'admin_panel'>(getInitialView);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedResourceType, setSelectedResourceType] = useState<string>('all');
@@ -100,6 +103,8 @@ export default function App() {
         setCurrentView(isAdminAuthenticated() ? 'admin_panel' : 'admin_login');
       } else if (path === RESOURCES_PATH) {
         setCurrentView('resources');
+      } else if (path === SCAM_CHECK_PATH) {
+        setCurrentView('scam_check');
       } else {
         setCurrentView('home');
       }
@@ -118,6 +123,12 @@ export default function App() {
   const handleOpenResources = () => {
     window.history.pushState({}, '', RESOURCES_PATH);
     setCurrentView('resources');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenScamCheck = () => {
+    window.history.pushState({}, '', SCAM_CHECK_PATH);
+    setCurrentView('scam_check');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -199,6 +210,7 @@ export default function App() {
               currentUser={currentUser}
               settings={settings}
               isAdmin={isAdminAuthenticated()}
+              onOpenScamCheck={handleOpenScamCheck}
             />
 
             <main>
@@ -213,6 +225,7 @@ export default function App() {
                     tagline={settings.tagline}
                     selectedResourceType={selectedResourceType}
                     onSelectResourceType={(type) => setSelectedResourceType(type)}
+                    onOpenScamCheck={handleOpenScamCheck}
                     onStartAssessment={() => {
                       setCurrentView('assessment');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -243,6 +256,10 @@ export default function App() {
 
               {currentView === 'resources' && (
                 <ResourceLibrary categories={categories} currentLanguage={currentLanguage} onBackToHome={handleNavigateHome} />
+              )}
+
+              {currentView === 'scam_check' && (
+                <ScamChecker currentLanguage={currentLanguage} onBackToHome={handleNavigateHome} />
               )}
 
               {currentView === 'assessment' && (
