@@ -83,8 +83,10 @@ if (!sameOrigin) {
 }
 
 // 2. Request size cap.
+// The scam checker accepts a compressed screenshot, so it gets a larger cap.
+const limit = url.pathname === '/api/scam-check' ? 3 * 1024 * 1024 : MAX_BODY_BYTES;
 const declared = Number(request.headers.get('Content-Length') || 0);
-  if (declared > MAX_BODY_BYTES) {
+  if (declared > limit) {
     return json({ error: 'That request is too large. Split the article into shorter sections and translate each one.' }, 413);
   }
 
