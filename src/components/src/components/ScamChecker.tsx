@@ -4,6 +4,7 @@ import {
   Link2, Phone, Mail, MessageSquare, AlertTriangle, ExternalLink,
 } from 'lucide-react';
 import { Language } from '../types';
+import { scamLabels, ScamLabels } from '../lib/scamI18n';
 
 interface ScamCheckerProps {
   currentLanguage: Language;
@@ -22,33 +23,33 @@ interface CheckResult {
   aiUsed: boolean;
 }
 
-const EXAMPLES: { label: string; icon: React.ReactNode; text: string }[] = [
+const EXAMPLES: { label: keyof ScamLabels; icon: React.ReactNode; text: string }[] = [
   {
-    label: 'Fake grant fee',
+    label: 'exFee',
     icon: <MessageSquare className="w-3.5 h-3.5" />,
     text: 'Dear NGO, Congratulations! Your organisation is selected for CSR grant of Rs 25,00,000 under NITI Aayog scheme. Pay processing fee of Rs 4,999 within 24 hours to release funds. Contact csr.niti.grant@gmail.com',
   },
   {
-    label: 'Fake FCRA notice',
+    label: 'exFcra',
     icon: <Link2 className="w-3.5 h-3.5" />,
     text: 'URGENT: Your FCRA registration will be suspended today due to incomplete KYC. Update immediately at http://fcra-gov-india.online/verify to avoid penalty.',
   },
   {
-    label: 'Boss impersonation',
+    label: 'exBoss',
     icon: <Mail className="w-3.5 h-3.5" />,
     text: "Hi, I'm in a meeting and can't talk right now. Need a quick favour - buy 5 Amazon gift cards of Rs 5000 for a donor event. Keep this confidential, I'll reimburse.",
   },
   {
-    label: 'Phone number',
+    label: 'exPhone',
     icon: <Phone className="w-3.5 h-3.5" />,
     text: '+92 301 5551234 called saying they are from CBI and our NGO account is under money laundering case',
   },
 ];
 
-const VERDICT_UI: Record<Verdict, { label: string; ring: string; bg: string; text: string; bar: string; Icon: typeof ShieldX }> = {
-  scam: { label: 'Likely a scam', ring: 'border-red-300', bg: 'bg-red-50', text: 'text-red-800', bar: 'bg-red-500', Icon: ShieldX },
-  suspicious: { label: 'Suspicious - verify first', ring: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-900', bar: 'bg-amber-500', Icon: ShieldAlert },
-  likely_safe: { label: 'No strong scam signs', ring: 'border-emerald-300', bg: 'bg-emerald-50', text: 'text-emerald-900', bar: 'bg-emerald-500', Icon: ShieldCheck },
+const VERDICT_UI: Record<Verdict, { label: keyof ScamLabels; ring: string; bg: string; text: string; bar: string; Icon: typeof ShieldX }> = {
+  scam: { label: 'verdictScam', ring: 'border-red-300', bg: 'bg-red-50', text: 'text-red-800', bar: 'bg-red-500', Icon: ShieldX },
+  suspicious: { label: 'verdictSuspicious', ring: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-900', bar: 'bg-amber-500', Icon: ShieldAlert },
+  likely_safe: { label: 'verdictSafe', ring: 'border-emerald-300', bg: 'bg-emerald-50', text: 'text-emerald-900', bar: 'bg-emerald-500', Icon: ShieldCheck },
 };
 
 /** Shrink a screenshot to at most 1600px / ~1.5 MB JPEG so it fits the API cap. */
@@ -97,6 +98,7 @@ function Linkify({ text }: { text: string }) {
 }
 
 export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBackToHome }) => {
+  const t = scamLabels(currentLanguage);
   const [text, setText] = useState('');
   const [image, setImage] = useState<string>('');
   const [imageName, setImageName] = useState('');
@@ -108,19 +110,19 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
 
   const onFile = async (file?: File | null) => {
     if (!file) return;
-    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) { setError('Please choose a PNG, JPG or WebP screenshot.'); return; }
-    if (file.size > 10 * 1024 * 1024) { setError('That image is over 10 MB. Try a smaller screenshot.'); return; }
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) { setError(t.errFileType); return; }
+    if (file.size > 10 * 1024 * 1024) { setError(t.errFileSize); return; }
     setError('');
     try {
       setImage(await compressImage(file));
       setImageName(file.name);
     } catch (e: any) {
-      setError(e?.message || 'Could not read that image.');
+      setError(t.errRead);
     }
   };
 
   const check = async () => {
-    if (!text.trim() && !image) { setError('Paste a message, link, phone number or email - or add a screenshot.'); return; }
+    if (!text.trim() && !image) { setError(t.errEmpty); return; }
     setLoading(true); setError(''); setResult(null);
     try {
       const res = await fetch('/api/scam-check', {
@@ -129,11 +131,11 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
         body: JSON.stringify({ text, image: image || undefined, language: currentLanguage }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'The checker is unavailable right now. Please try again.');
+      if (!res.ok) throw new Error(data.error || t.errUnavailable);
       setResult(data as CheckResult);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     } catch (e: any) {
-      setError(e?.message || 'Something went wrong.');
+      setError(e?.message || t.errGeneric);
     } finally {
       setLoading(false);
     }
@@ -145,16 +147,16 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
       <button onClick={onBackToHome} className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 mb-6 cursor-pointer">
-        <ArrowLeft className="w-4 h-4" /> Back to Hub
+        <ArrowLeft className="w-4 h-4" /> {t.back}
       </button>
 
       <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-800">
-          <ShieldCheck className="w-3.5 h-3.5" /> Don't trust. Verify.
+          <ShieldCheck className="w-3.5 h-3.5" /> {t.badge}
         </span>
-        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">Is this a scam?</h1>
+        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">{t.title}</h1>
         <p className="mt-2 text-slate-600 max-w-xl mx-auto">
-          Free checker for NGOs. Paste a suspicious email, WhatsApp, SMS, link, phone number or sender address - or upload a screenshot.
+          {t.intro}
         </p>
       </div>
 
@@ -167,7 +169,7 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
             if (f && f.type.startsWith('image/')) { e.preventDefault(); onFile(f); }
           }}
           rows={7}
-          placeholder="Paste a suspicious email, message, link, phone number or sender address here..."
+          placeholder={t.placeholder}
           className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
         />
         <div className="mt-1 text-right text-[11px] text-slate-400">{text.length}/6000</div>
@@ -178,13 +180,13 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
           className="mt-2 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-dashed border-slate-300 p-3"
         >
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-slate-800">Add a screenshot</div>
-            <div className="text-xs text-slate-500">Drag & drop, paste, or choose a file. PNG / JPG / WebP up to 10 MB.</div>
+            <div className="text-sm font-semibold text-slate-800">{t.addScreenshot}</div>
+            <div className="text-xs text-slate-500">{t.screenshotHint}</div>
             {imageName && (
               <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700 max-w-full">
                 <img src={image} alt="" className="w-8 h-8 object-cover rounded" />
                 <span className="truncate">{imageName}</span>
-                <button onClick={() => { setImage(''); setImageName(''); }} className="text-slate-500 hover:text-red-600 cursor-pointer" aria-label="Remove screenshot">
+                <button onClick={() => { setImage(''); setImageName(''); }} className="text-slate-500 hover:text-red-600 cursor-pointer" aria-label={t.removeScreenshot}>
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -192,7 +194,7 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
           </div>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ''; }} />
           <button onClick={() => fileRef.current?.click()} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
-            <Upload className="w-4 h-4" /> Choose file
+            <Upload className="w-4 h-4" /> {t.chooseFile}
           </button>
         </div>
 
@@ -208,19 +210,19 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
             disabled={loading}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-semibold px-5 py-3 cursor-pointer transition-colors"
           >
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking...</> : <><ShieldCheck className="w-4 h-4" /> Check now</>}
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> {t.checking}</> : <><ShieldCheck className="w-4 h-4" /> {t.checkNow}</>}
           </button>
           {(text || image || result) && (
-            <button onClick={reset} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">Clear</button>
+            <button onClick={reset} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">{t.clear}</button>
           )}
         </div>
 
         <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Try an example</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{t.tryExample}</div>
           <div className="flex flex-wrap gap-1.5">
             {EXAMPLES.map((ex) => (
               <button key={ex.label} onClick={() => { setText(ex.text); setResult(null); }} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 px-2.5 py-1 text-xs text-slate-700 cursor-pointer">
-                {ex.icon} {ex.label}
+                {ex.icon} {t[ex.label]}
               </button>
             ))}
           </div>
@@ -232,14 +234,14 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
           <div className="flex items-start gap-3">
             <ui.Icon className={`w-9 h-9 shrink-0 ${ui.text}`} />
             <div className="flex-1 min-w-0">
-              <div className={`text-xl font-extrabold ${ui.text}`}>{ui.label}</div>
+              <div className={`text-xl font-extrabold ${ui.text}`}>{t[ui.label]}</div>
               <p className="mt-1 text-sm text-slate-700">{result.summary}</p>
             </div>
           </div>
 
           <div className="mt-4">
             <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1">
-              <span>Risk score</span><span>{result.score}/100</span>
+              <span>{t.riskScore}</span><span>{result.score}/100</span>
             </div>
             <div className="h-2.5 rounded-full bg-white/80 overflow-hidden border border-slate-200">
               <div className={`h-full ${ui.bar} transition-all`} style={{ width: `${Math.max(4, result.score)}%` }} />
@@ -248,7 +250,7 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
 
           {result.flags.length > 0 && (
             <div className="mt-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">Red flags found</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">{t.redFlags}</h3>
               <ul className="space-y-1.5">
                 {result.flags.map((f, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-800">
@@ -261,13 +263,13 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
 
           {result.links?.length > 0 && (
             <div className="mt-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">Links in this message</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">{t.links}</h3>
               <ul className="space-y-1">
                 {result.links.map((l) => (
                   <li key={l.url} className="flex items-center gap-2 text-sm">
                     <span className={`inline-block w-2 h-2 rounded-full ${l.risky ? 'bg-red-500' : 'bg-slate-400'}`} />
                     <code className="break-all text-slate-800">{l.host}</code>
-                    {l.risky && <span className="text-xs font-semibold text-red-700">risky - do not open</span>}
+                    {l.risky && <span className="text-xs font-semibold text-red-700">{t.riskyLink}</span>}
                   </li>
                 ))}
               </ul>
@@ -275,7 +277,7 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
           )}
 
           <div className="mt-5 rounded-xl bg-white/80 border border-slate-200 p-4">
-            <h3 className="text-sm font-bold text-slate-900 mb-2">What to do next</h3>
+            <h3 className="text-sm font-bold text-slate-900 mb-2">{t.nextSteps}</h3>
             <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-800">
               {result.advice.map((a, i) => <li key={i}><Linkify text={a} /></li>)}
             </ol>
@@ -283,34 +285,34 @@ export const ScamChecker: React.FC<ScamCheckerProps> = ({ currentLanguage, onBac
 
           {result.extractedText && (
             <details className="mt-4 text-xs text-slate-600">
-              <summary className="cursor-pointer font-semibold">Text read from your screenshot</summary>
+              <summary className="cursor-pointer font-semibold">{t.extracted}</summary>
               <p className="mt-1 whitespace-pre-wrap">{result.extractedText}</p>
             </details>
           )}
 
           {!result.aiUsed && (
-            <p className="mt-3 text-xs text-slate-500">AI review was unavailable, so this result is based on automated checks only.</p>
+            <p className="mt-3 text-xs text-slate-500">{t.aiUnavailable}</p>
           )}
         </div>
       )}
 
       <div className="mt-8 grid sm:grid-cols-3 gap-3 text-sm">
         <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
-          <div className="font-bold text-slate-900 flex items-center gap-1">Report a scam <ExternalLink className="w-3.5 h-3.5" /></div>
-          <div className="text-slate-600 text-xs mt-1">National Cyber Crime Reporting Portal</div>
+          <div className="font-bold text-slate-900 flex items-center gap-1">{t.reportTitle} <ExternalLink className="w-3.5 h-3.5" /></div>
+          <div className="text-slate-600 text-xs mt-1">{t.reportSub}</div>
         </a>
         <a href="tel:1930" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
-          <div className="font-bold text-slate-900">Call 1930</div>
-          <div className="text-slate-600 text-xs mt-1">Lost money? Call within the first hour if you can.</div>
+          <div className="font-bold text-slate-900">{t.callTitle}</div>
+          <div className="text-slate-600 text-xs mt-1">{t.callSub}</div>
         </a>
         <a href="https://sancharsaathi.gov.in" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
           <div className="font-bold text-slate-900 flex items-center gap-1">Sanchar Saathi <ExternalLink className="w-3.5 h-3.5" /></div>
-          <div className="text-slate-600 text-xs mt-1">Report fraud calls / SMS (Chakshu)</div>
+          <div className="text-slate-600 text-xs mt-1">{t.saathiSub}</div>
         </a>
       </div>
 
       <p className="mt-6 text-center text-[11px] text-slate-500">
-        Nothing you check is stored. This tool gives guidance, not a guarantee - always verify through official channels before you pay or share details.
+        {t.disclaimer}
       </p>
     </div>
   );

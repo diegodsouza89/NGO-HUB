@@ -14,6 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Language, SUPPORTED_LANGUAGES, SiteSettings, User as UserType } from '../types';
+import { scamLabels } from '../lib/scamI18n';
 
 interface NavbarProps {
   currentLanguage: Language;
@@ -201,7 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-full text-left flex items-center gap-2 px-3 py-2 text-emerald-900 bg-emerald-50 rounded-lg text-sm font-semibold"
             >
               <ShieldCheck className="w-4 h-4 text-emerald-700" />
-              <span>Is this a scam? Check it</span>
+              <span>{scamLabels(currentLanguage).navLink}</span>
             </button>
           )}
 

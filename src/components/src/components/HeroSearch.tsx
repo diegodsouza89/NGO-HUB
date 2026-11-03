@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, FileText, Layers, CornerDownLeft, ClipboardCheck, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Article, Category, Language } from '../types';
 import { heroLabels, DEFAULT_TAGLINE_EN } from '../lib/heroI18n';
+import { scamLabels } from '../lib/scamI18n';
 
 interface HeroSearchProps {
   currentLanguage: Language;
@@ -292,7 +293,7 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
               className="inline-flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 font-semibold px-5 py-2.5 text-sm shadow-2xs transition-colors cursor-pointer"
             >
               <ShieldCheck className="w-4 h-4 text-emerald-700" />
-              <span>Got a suspicious message? Check if it's a scam</span>
+              <span>{scamLabels(currentLanguage).heroCta}</span>
               <ArrowRight className="w-4 h-4 text-emerald-700" />
             </button>
           </div>
