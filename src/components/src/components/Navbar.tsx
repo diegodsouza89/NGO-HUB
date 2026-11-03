@@ -10,7 +10,8 @@ import {
   User,
   Bookmark,
   LogIn,
-  BookOpen
+  BookOpen,
+  ShieldCheck,
 } from 'lucide-react';
 import { Language, SUPPORTED_LANGUAGES, SiteSettings, User as UserType } from '../types';
 
@@ -24,6 +25,7 @@ interface NavbarProps {
   currentUser: UserType | null;
   settings: SiteSettings;
   isAdmin: boolean;
+  onOpenScamCheck?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -36,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   settings,
   isAdmin,
+  onOpenScamCheck,
 }) => {
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -83,6 +86,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Desktop Navigation Controls */}
           <div className="hidden md:flex items-center gap-3">
+            {onOpenScamCheck && (
+              <button
+                onClick={onOpenScamCheck}
+                className="flex items-center gap-1.5 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span>Scam Check</span>
+              </button>
+            )}
             {/* User Member Portal Account Button */}
             {currentUser ? (
               <button
@@ -179,6 +191,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Search className="w-4 h-4 text-slate-500" />
             <span>Search Articles & Toolkits</span>
           </button>
+
+          {onOpenScamCheck && (
+            <button
+              onClick={() => {
+                onOpenScamCheck();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full text-left flex items-center gap-2 px-3 py-2 text-emerald-900 bg-emerald-50 rounded-lg text-sm font-semibold"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <span>Is this a scam? Check it</span>
+            </button>
+          )}
 
           {currentUser ? (
             <button
